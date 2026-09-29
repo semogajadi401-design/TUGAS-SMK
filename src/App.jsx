@@ -11,6 +11,8 @@ import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
 import Shell, { I } from './Shell.jsx'
 import Calendar from './Calendar.jsx'
 import Recap from './Recap.jsx'
+import Materials from './Materials.jsx'
+import StudentMaterials from './StudentMaterials.jsx'
 
 function ChangePassword({ onDone, code }) {
   const [pw, setPw] = useState('')
@@ -51,6 +53,7 @@ function Student({ profile, reload, s }) {
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
+    { k: 'materials', label: 'Materi', icon: I.book },
     { k: 'calendar', label: 'Kalender', icon: I.calendar },
     { k: 'grades', label: 'Nilai', icon: I.star },
     { k: 'account', label: 'Akun', icon: I.user },
@@ -59,6 +62,7 @@ function Student({ profile, reload, s }) {
     <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
       {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
+      {tab === 'materials' && <StudentMaterials />}
       {tab === 'calendar' && <Calendar onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
@@ -76,6 +80,7 @@ function Teacher({ profile, s, onSaved }) {
   const items = [
     { k: 'dash', label: 'Dasbor', icon: I.grid },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
+    { k: 'materials', label: 'Materi', icon: I.book },
     { k: 'grading', label: 'Penilaian', icon: I.check },
     { k: 'recap', label: 'Rekap Nilai', icon: I.table },
     { k: 'students', label: 'Siswa & Kelas', icon: I.users },
@@ -85,6 +90,7 @@ function Teacher({ profile, s, onSaved }) {
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
       {tab === 'dash' && <Dashboard profile={profile} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
+      {tab === 'materials' && <Materials profile={profile} />}
       {tab === 'grading' && <Grading />}
       {tab === 'recap' && <Recap />}
       {tab === 'students' && <Students />}
