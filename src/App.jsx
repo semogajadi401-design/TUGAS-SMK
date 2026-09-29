@@ -1,42 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase, toEmail } from './supabase.js'
 import Students from './Students.jsx'
+import Login from './Login.jsx'
+import Dashboard from './Dashboard.jsx'
+import Home from './Home.jsx'
 import Settings, { Brand, loadSettings, DEFAULTS } from './Settings.jsx'
-
-function Login({ s }) {
-  const [id, setId] = useState('')
-  const [pw, setPw] = useState('')
-  const [err, setErr] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e) {
-    e.preventDefault()
-    setBusy(true); setErr('')
-    const email = toEmail(id)
-    let { error } = await supabase.auth.signInWithPassword({ email, password: pw })
-    if (error && pw !== pw.toUpperCase())
-      ({ error } = await supabase.auth.signInWithPassword({ email, password: pw.toUpperCase() }))
-    if (error) setErr('Kode atau password salah. Coba lagi, atau minta guru mereset passwordmu.')
-    setBusy(false)
-  }
-
-  return (
-    <div className="login">
-      <div className="brand"><Brand s={s} size={76} /><h1>{s.school_name}</h1></div>
-      <p>Masuk untuk melihat tugas dan nilaimu.</p>
-      <form className="card" onSubmit={submit}>
-        <label htmlFor="id">Kode</label>
-        <input id="id" value={id} onChange={(e) => setId(e.target.value)}
-          autoCapitalize="none" autoComplete="username" required />
-        <label htmlFor="pw">Password</label>
-        <input id="pw" type="password" value={pw}
-          onChange={(e) => setPw(e.target.value)} autoComplete="current-password" required />
-        {err && <div className="err">{err}</div>}
-        <button className="btn" disabled={busy}>{busy ? 'Memeriksa...' : 'Masuk'}</button>
-      </form>
-    </div>
-  )
-}
 
 function ChangePassword({ onDone }) {
   const [pw, setPw] = useState('')
@@ -76,12 +44,7 @@ function Student({ profile, reload, s }) {
     <div className="shell">
       <div className="top"><Brand s={s} size={42} /><div><small>Halo, {s.school_name}</small><strong>{profile.full_name}</strong></div></div>
       <div className="page">
-        {tab === 'home' && (<>
-          {!profile.password_changed && (
-            <div className="banner">Password kamu masih kode awal. Ganti di tab Akun supaya akunmu aman.</div>
-          )}
-          <h2>Beranda</h2><Soon text="Daftar tugas akan muncul di sini (Langkah 3)." />
-        </>)}
+        {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} />}
         {tab === 'tasks' && (<><h2>Tugas</h2><Soon text="Segera hadir (Langkah 3)." /></>)}
         {tab === 'grades' && (<><h2>Nilai</h2><Soon text="Segera hadir (Langkah 3)." /></>)}
         {tab === 'account' && (<>
@@ -106,11 +69,12 @@ function Teacher({ profile, s, onSaved }) {
     <div className="shell">
       <div className="top"><Brand s={s} size={42} /><div><small>{s.school_name}</small><strong>{profile.full_name}</strong></div></div>
       <div className="page">
-        {tab === 'dash' && (<><h2>Dasbor</h2>
-          <Soon text="Ringkasan tugas muncul di sini (Langkah 4)." />
-          <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Keluar</button></>)}
+        {tab === 'dash' && <Dashboard profile={profile} />}
         {tab === 'students' && <Students />}
-        {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
+        {tab === 'settings' && (<>
+          <Settings s={s} onSaved={onSaved} />
+          <button className="btn ghost" style={{ marginTop: 12 }} onClick={() => supabase.auth.signOut()}>Keluar</button>
+        </>)}
       </div>
       <nav className="tabs">
         {[['dash', 'Dasbor'], ['students', 'Siswa & Kelas'], ['settings', 'Pengaturan']].map(([k, l]) => (

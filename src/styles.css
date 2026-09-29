@@ -78,3 +78,60 @@ select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius
   box-shadow:0 0 0 1.5px var(--line)}
 .sw.on{box-shadow:0 0 0 3px var(--ink)}
 .sw-pick{width:44px;height:38px;padding:0;margin:0;border-radius:10px}
+
+/* ---- Login baru ---- */
+.login{position:relative;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(2px);pointer-events:none}
+.o1{width:260px;height:260px;right:-90px;top:-70px;background:rgba(255,255,255,.08)}
+.o2{width:180px;height:180px;left:-60px;top:230px;background:var(--chalk);opacity:.18}
+.login .brand{position:relative;margin-bottom:0}
+.login .brand h1{font-size:1.7rem;margin:0 0 4px}
+.login .brand p{margin:0}
+.glass{position:relative;padding:24px 20px 20px}
+.glass h2{margin:0 0 18px;font-size:1.3rem}
+.field{position:relative;margin-bottom:16px}
+.field input{margin:0;padding:22px 46px 8px 46px;height:58px;border-radius:14px;background:#f4f7f5}
+.field input:focus{background:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--board) 15%,transparent)}
+.field label{position:absolute;left:46px;top:19px;margin:0;font-weight:500;color:var(--muted);
+  pointer-events:none;transition:all .15s}
+.field input:focus+label,.field input:not(:placeholder-shown)+label{top:8px;font-size:.72rem;color:var(--board);font-weight:700}
+.ico{position:absolute;left:15px;top:18px;color:var(--board);display:flex}
+.eye{position:absolute;right:6px;top:7px;width:44px;height:44px;border:0;background:none;color:var(--muted);
+  cursor:pointer;display:grid;place-items:center;border-radius:10px}
+.btn.big{padding:16px;font-size:1.05rem;margin-top:4px}
+.hint{text-align:center;color:var(--muted);font-size:.85rem;margin:14px 0 0}
+
+/* ---- Statistik ---- */
+.greet small{color:var(--muted)}
+.greet h2{margin:2px 0 16px;font-size:1.5rem}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stats.three{grid-template-columns:repeat(3,1fr)}
+.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}
+.stat b{display:block;font-size:1.9rem;line-height:1.1;color:var(--board);letter-spacing:-.02em}
+.stat span{color:var(--muted);font-size:.8rem}
+.stat.hot{background:var(--chalk);border-color:var(--chalk)}
+.stat.hot b,.stat.hot span{color:#3a2b00}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.panel h3,.sec{margin:0 0 12px;font-size:1rem}
+.sec{margin-top:20px}
+.panel p{margin:10px 0 0}
+.bar{display:grid;grid-template-columns:64px 1fr 28px;gap:10px;align-items:center;margin-bottom:8px;font-size:.9rem}
+.bar div{background:#edf2ef;border-radius:99px;height:12px;overflow:hidden}
+.bar i,.meter i{display:block;height:100%;background:var(--board);border-radius:99px}
+.bar b{text-align:right}
+.meter{background:#edf2ef;border-radius:99px;height:14px;overflow:hidden}
+.meter.warn i{background:var(--danger)}
+
+/* ---- Beranda siswa ---- */
+.hero{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#fff;
+  background:linear-gradient(165deg,var(--board),var(--board-dark));border-radius:22px;padding:20px;margin-bottom:12px}
+.hero small{color:#cfe3dc}
+.hero h2{margin:0;font-size:1.6rem;color:#fff}
+.hero p{margin:6px 0 0;color:#e4f1ec}
+.task{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.chip{font-size:.75rem;font-weight:700;padding:5px 10px;border-radius:99px;background:#edf2ef;
+  color:var(--muted);white-space:nowrap}
+.chip.soon{background:#fff0c2;color:#7a5a00}
+.chip.late{background:#fdecea;color:var(--danger)}
+.inline{background:none;border:0;padding:0;color:var(--board);font-weight:700;text-decoration:underline;cursor:pointer}
