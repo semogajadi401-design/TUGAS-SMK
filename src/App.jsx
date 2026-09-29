@@ -113,7 +113,7 @@ function Teacher({ profile, s, onSaved }) {
   return (
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
       <Suspense fallback={Wait}>
-      {tab === 'dash' && <Dashboard profile={profile} />}
+      {tab === 'dash' && <Dashboard profile={profile} go={setTab} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
       {tab === 'grading' && <Grading />}
