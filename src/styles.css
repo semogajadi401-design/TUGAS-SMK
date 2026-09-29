@@ -54,6 +54,10 @@ select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius
 .modal{background:#fff;width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;
   padding:20px 20px calc(var(--sab) + 20px)}
 .modal h2{margin:0 0 8px}
+@media (min-width:700px){
+  .modal-bg{align-items:center;padding:20px}
+  .modal{border-radius:18px;padding:24px;max-height:88vh}
+}
 .prob{font-size:.85rem;padding:6px 10px;border-radius:6px;margin-bottom:4px}
 .prob.error{background:#fdecea;color:var(--danger)}
 .prob.skip{background:#fff6dc;color:#7a5a00}
