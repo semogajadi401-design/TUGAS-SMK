@@ -1,0 +1,19 @@
+/* Angka kecil pada menu dan pop up pemberitahuan siswa */
+.menu-btn{position:relative}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;
+  border-radius:99px;background:#e5484d;color:#fff;font-size:.72rem;font-weight:800;line-height:1;margin-left:auto}
+.badge.corner{position:absolute;top:-4px;right:-4px;margin:0;box-shadow:0 0 0 2px #fff}
+.nf-scrim{position:fixed;inset:0;z-index:90;background:rgba(15,20,25,.55);display:flex;align-items:center;
+  justify-content:center;padding:20px}
+.nf-box{background:#fff;border-radius:18px;width:100%;max-width:400px;max-height:85vh;overflow:auto;
+  padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.nf-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.nf-head h3{margin:0;font-size:1.1rem}
+.nf-x{border:0;background:var(--soft,#eef1ef);width:36px;height:36px;border-radius:50%;font-size:1.2rem;
+  line-height:1;cursor:pointer;color:inherit}
+.nf-item{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 0;
+  border-bottom:1px solid var(--line,#e3e7e5)}
+.nf-item:last-of-type{border-bottom:0}
+.nf-item b{display:block}
+.nf-item small{display:block;color:var(--muted,#6b7480);margin-top:2px;overflow-wrap:anywhere}
+.nf-go{border:0;background:none;color:var(--board);font-weight:700;cursor:pointer;white-space:nowrap;padding:4px 0}
