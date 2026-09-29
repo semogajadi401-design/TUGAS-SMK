@@ -135,3 +135,21 @@ select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius
 .chip.soon{background:#fff0c2;color:#7a5a00}
 .chip.late{background:#fdecea;color:var(--danger)}
 .inline{background:none;border:0;padding:0;color:var(--board);font-weight:700;text-decoration:underline;cursor:pointer}
+
+/* ---- Tugas (guru) ---- */
+textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px;resize:vertical}
+textarea:focus{border-color:var(--board);outline:none}
+.seg{display:flex;gap:6px;margin-bottom:16px}
+.seg button,.checks button{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;
+  font-weight:600;color:var(--muted);cursor:pointer}
+.seg button{flex:1}
+.seg button.on,.checks button.on{border-color:var(--board);background:color-mix(in srgb,var(--board) 10%,white);color:var(--board)}
+.checks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.taskcard{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;color:inherit}
+.line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.line:last-child{border-bottom:0}
+.chip.sent{background:#dcefe8;color:var(--board)}
+.chip.graded{background:var(--board);color:#fff}
+.chip.draft{background:#fff0c2;color:#7a5a00}
+.chip.none{background:#fdecea;color:var(--danger)}

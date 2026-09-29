@@ -44,7 +44,7 @@ export default function Login({ s }) {
           <span className="ico"><Icon d={P.user} /></span>
           <input id="id" placeholder=" " value={id} onChange={(e) => setId(e.target.value)}
             autoCapitalize="none" autoCorrect="off" autoComplete="username" required />
-          <label htmlFor="id">Kode siswa</label>
+          <label htmlFor="id">Kode siswa atau email guru</label>
         </div>
         <div className="field">
           <span className="ico"><Icon d={P.lock} /></span>

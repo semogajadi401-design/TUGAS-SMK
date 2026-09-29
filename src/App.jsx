@@ -4,6 +4,7 @@ import Students from './Students.jsx'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
+import Tasks from './Tasks.jsx'
 import Settings, { Brand, loadSettings, DEFAULTS } from './Settings.jsx'
 
 function ChangePassword({ onDone }) {
@@ -70,6 +71,7 @@ function Teacher({ profile, s, onSaved }) {
       <div className="top"><Brand s={s} size={42} /><div><small>{s.school_name}</small><strong>{profile.full_name}</strong></div></div>
       <div className="page">
         {tab === 'dash' && <Dashboard profile={profile} />}
+        {tab === 'tasks' && <Tasks profile={profile} />}
         {tab === 'students' && <Students />}
         {tab === 'settings' && (<>
           <Settings s={s} onSaved={onSaved} />
@@ -77,7 +79,7 @@ function Teacher({ profile, s, onSaved }) {
         </>)}
       </div>
       <nav className="tabs">
-        {[['dash', 'Dasbor'], ['students', 'Siswa & Kelas'], ['settings', 'Pengaturan']].map(([k, l]) => (
+        {[['dash', 'Dasbor'], ['tasks', 'Tugas'], ['students', 'Siswa & Kelas'], ['settings', 'Pengaturan']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>

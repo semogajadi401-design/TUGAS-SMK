@@ -65,6 +65,7 @@ function ImportModal({ onClose }) {
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [prog, setProg] = useState(null)
 
   async function onFile(e) {
     const f = e.target.files[0]
@@ -84,10 +85,19 @@ function ImportModal({ onClose }) {
 
   async function doImport() {
     setBusy(true); setErr('')
+    const okRows = view.filter((r) => r.status === 'ok').map(({ nama, kelas, kode }) => ({ nama, kelas, kode }))
+    const all = []
     try {
-      const okRows = view.filter((r) => r.status === 'ok').map(({ nama, kelas, kode }) => ({ nama, kelas, kode }))
-      setResult(await callApi(okRows, false))
-    } catch (x) { setErr(x.message) }
+      for (let i = 0; i < okRows.length; i += 20) {
+        setProg({ done: i, total: okRows.length })
+        all.push(...await callApi(okRows.slice(i, i + 20), false))
+      }
+      setProg(null); setResult(all)
+    } catch (x) {
+      setProg(null)
+      setErr(x.message + '. Sebagian akun mungkin sudah terbuat. Tutup jendela ini, cek daftar siswa, lalu impor ulang file yang sama (yang sudah terdaftar otomatis dilewati).')
+      if (all.length) setResult(all)
+    }
     setBusy(false)
   }
 
@@ -118,8 +128,10 @@ function ImportModal({ onClose }) {
             <div key={i} className={'prob ' + r.status}>{r.nama || '(tanpa nama)'} {r.kelas && `(${r.kelas})`}: {r.reason}</div>
           ))}
           <button className="btn" style={{ marginTop: 12 }} disabled={busy || !count('ok')} onClick={doImport}>
-            Impor {count('ok')} siswa
+            {prog ? `Membuat akun... ${prog.done} dari ${prog.total}` : `Impor ${count('ok')} siswa`}
           </button>
+          {prog && <div className="meter" style={{ marginTop: 10 }}><i style={{ width: (prog.done / prog.total) * 100 + '%' }} /></div>}
+          {prog && <p className="muted">Jangan tutup halaman ini sampai selesai.</p>}
         </>)}
       </>)}
       {result && (<>
