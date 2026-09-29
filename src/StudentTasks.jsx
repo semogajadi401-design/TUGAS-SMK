@@ -36,11 +36,12 @@ function compress(file, max = 1280, q = 0.7) {
 function List({ onOpen }) {
   const [rows, setRows] = useState(null)
   const [f, setF] = useState('todo')
+  const [sj, setSj] = useState('')
 
   useEffect(() => {
     (async () => {
       const [a, s] = await Promise.all([
-        supabase.from('assignments').select('id,title,due_at').eq('status', 'active')
+        supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active')
           .order('due_at', { ascending: true, nullsFirst: false }),
         supabase.from('submissions').select('assignment_id,status,score'),
       ])
@@ -51,19 +52,26 @@ function List({ onOpen }) {
 
   const filters = [['todo', 'Belum'], ['sent', 'Dikirim'], ['graded', 'Dinilai'], ['all', 'Semua']]
   const match = (r) => f === 'all' || (f === 'todo' ? r.st === 'todo' || r.st === 'draft' : r.st === f)
-  const shown = (rows || []).filter(match)
+  const mapel = [...new Set((rows || []).map((r) => r.subjects?.name).filter(Boolean))].sort()
+  const shown = (rows || []).filter(match).filter((r) => !sj || r.subjects?.name === sj)
 
   return (<>
     <div className="seg">
       {filters.map(([k, l]) => <button key={k} className={f === k ? 'on' : ''} onClick={() => setF(k)}>{l}</button>)}
     </div>
+    {mapel.length > 1 && (
+      <select value={sj} onChange={(e) => setSj(e.target.value)} style={{ marginBottom: 12 }}>
+        <option value="">Semua mapel</option>
+        {mapel.map((m) => <option key={m}>{m}</option>)}
+      </select>
+    )}
     {rows === null && <div className="empty">Memuat...</div>}
     {rows && !shown.length && <div className="empty">Tidak ada tugas di kategori ini.</div>}
     {shown.map((t) => {
       const di = dueInfo(t.due_at)
       return (
         <button className="task" key={t.id} onClick={() => onOpen(t.id)}>
-          <div><b>{t.title}</b><div className="muted">{LABEL[t.st]}</div></div>
+          <div><b>{t.title}</b><div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}</div></div>
           {t.st === 'todo' || t.st === 'draft'
             ? <span className={'chip ' + di.c}>{di.t}</span>
             : <span className={'chip ' + (t.st === 'graded' ? 'graded' : 'sent')}>{LABEL[t.st]}</span>}
@@ -223,19 +231,28 @@ export default function StudentTasks({ profile, openId, setOpenId }) {
 export function Grades() {
   const [rows, setRows] = useState(null)
   useEffect(() => {
-    supabase.from('submissions').select('score,feedback,updated_at,assignments(title)')
+    supabase.from('submissions').select('score,feedback,updated_at,assignments(title,subjects(name))')
       .not('score', 'is', null).order('updated_at', { ascending: false })
       .then((r) => setRows(r.data || []))
   }, [])
   if (rows === null) return <div className="empty">Memuat...</div>
   const avg = rows.length ? Math.round(rows.reduce((n, r) => n + Number(r.score), 0) / rows.length) : null
+  const per = {}
+  rows.forEach((r) => { const n = r.assignments?.subjects?.name || 'Tanpa mapel'; (per[n] = per[n] || []).push(Number(r.score)) })
   return (<>
     {avg !== null && <div className="hero"><div><small>Rata-rata nilai</small><h2>{avg}</h2><p>dari {rows.length} tugas</p></div></div>}
+    {Object.keys(per).length > 1 && (
+      <div className="stats">
+        {Object.entries(per).map(([n, v]) => (
+          <div className="stat" key={n}><b>{Math.round(v.reduce((a, b) => a + b, 0) / v.length)}</b><span>{n}</span></div>
+        ))}
+      </div>
+    )}
     {!rows.length && <div className="empty">Belum ada tugas yang dinilai.</div>}
     {rows.map((r, i) => (
       <div className="result" key={i}>
         <div className="big">{r.score}</div>
-        <div><b>{r.assignments?.title}</b>{r.feedback && <p>{r.feedback}</p>}</div>
+        <div><b>{r.assignments?.title}</b>{r.assignments?.subjects?.name && <div className="muted">{r.assignments.subjects.name}</div>}{r.feedback && <p>{r.feedback}</p>}</div>
       </div>
     ))}
   </>)

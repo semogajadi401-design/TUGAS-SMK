@@ -28,7 +28,7 @@ export default function Home({ profile, goAccount, onOpen }) {
   useEffect(() => {
     (async () => {
       const [a, s] = await Promise.all([
-        supabase.from('assignments').select('id,title,due_at').eq('status', 'active'),
+        supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active'),
         supabase.from('submissions').select('assignment_id,status,score'),
       ])
       const sub = new Map((s.data || []).map((x) => [x.assignment_id, x]))
@@ -76,7 +76,7 @@ export default function Home({ profile, goAccount, onOpen }) {
           const di = dueInfo(t.due_at)
           return (
             <button className="task" key={t.id} onClick={() => onOpen?.(t.id)}>
-              <div><b>{t.title}</b></div>
+              <div><b>{t.title}</b>{t.subjects?.name && <div className="muted">{t.subjects.name}</div>}</div>
               <span className={'chip ' + di.c}>{di.t}</span>
             </button>
           )

@@ -8,10 +8,11 @@ const when = (d) => d ? new Date(d).toLocaleString('id-ID',
 /* ---------- Daftar tugas yang perlu dinilai ---------- */
 function TaskList({ onOpen }) {
   const [rows, setRows] = useState(null)
+  const [sj, setSj] = useState('')
   useEffect(() => {
     (async () => {
       const [a, s] = await Promise.all([
-        supabase.from('assignments').select('id,title,due_at,status,answer_type').order('created_at', { ascending: false }),
+        supabase.from('assignments').select('id,title,due_at,status,answer_type,subjects(name)').order('created_at', { ascending: false }),
         supabase.from('submissions').select('assignment_id,status,score').eq('status', 'submitted'),
       ])
       const list = (a.data || []).map((t) => {
@@ -22,14 +23,21 @@ function TaskList({ onOpen }) {
       setRows(list)
     })()
   }, [])
+  const mapel = [...new Set((rows || []).map((t) => t.subjects?.name).filter(Boolean))].sort()
   return (<>
     <h2>Penilaian</h2>
     <p className="muted">Pilih tugas untuk melihat jawaban siswa dan memberi nilai. Nilai langsung terlihat oleh siswa setelah disimpan.</p>
+    {mapel.length > 1 && (
+      <select value={sj} onChange={(e) => setSj(e.target.value)} style={{ marginBottom: 12 }}>
+        <option value="">Semua mapel</option>
+        {mapel.map((m) => <option key={m}>{m}</option>)}
+      </select>
+    )}
     {rows === null && <div className="empty">Memuat...</div>}
     {rows && !rows.length && <div className="empty">Belum ada tugas.</div>}
-    {rows && rows.map((t) => (
+    {rows && rows.filter((t) => !sj || t.subjects?.name === sj).map((t) => (
       <button className="taskcard" key={t.id} onClick={() => onOpen(t)}>
-        <div><b>{t.title}</b><div className="muted">{t.sent} siswa sudah kirim{t.status === 'archived' ? ' · Arsip' : ''}</div></div>
+        <div><b>{t.title}</b><div className="muted">{t.subjects?.name && t.subjects.name + ' · '}{t.sent} siswa sudah kirim{t.status === 'archived' ? ' · Arsip' : ''}</div></div>
         <span className={'chip ' + (t.waiting ? 'soon' : 'graded')}>{t.waiting ? `${t.waiting} belum dinilai` : 'Selesai'}</span>
       </button>
     ))}
