@@ -195,7 +195,7 @@ export default function StudentQuiz() {
             {q.attempt === 'progress' && <span className="chip soon">Sedang dikerjakan</span>}
           </div>
           <p className="muted">
-            {q.state === 'upcoming' && q.open_at ? `Dibuka ${when(q.open_at)}` : q.close_at ? `Ditutup ${when(q.close_at)}` : 'Tanpa batas waktu tutup'}
+            {[q.open_at && `Dibuka ${when(q.open_at)}`, q.close_at ? `Ditutup ${when(q.close_at)}` : 'Tanpa batas waktu tutup'].filter(Boolean).join(' · ')}
           </p>
           {q.instructions && <p className="instr">{q.instructions}</p>}
           <button className={'btn' + (q.attempt === 'done' && !q.result_ready ? ' ghost' : '')} style={{ marginTop: 12 }}
