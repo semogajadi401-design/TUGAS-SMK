@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 export const config = { maxDuration: 60 }
 
 // Item yang otomatis ikut terpilih (karena datanya saling bergantung).
-const NEEDS = { submissions: ['photos', 'scores'], assignments: ['submissions'], students: ['submissions'] }
+const NEEDS = { submissions: ['photos', 'scores'], assignments: ['submissions'], students: ['submissions', 'quizresults'], quizzes: ['quizresults'] }
 const expand = (list) => {
   const s = new Set(list)
   for (let ch = true; ch;) { ch = false; for (const k of [...s]) for (const n of NEEDS[k] || []) if (!s.has(n)) { s.add(n); ch = true } }
   return s
 }
-const ALL = ['scores', 'photos', 'submissions', 'assignments', 'passwords', 'students', 'classes', 'subjects']
+const ALL = ['scores', 'photos', 'submissions', 'assignments', 'quizresults', 'quizzes', 'materials', 'passwords', 'students', 'classes', 'subjects']
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Metode tidak diizinkan' })
@@ -68,6 +68,27 @@ export default async function handler(req, res) {
       const r = await any('assignments'); ok(r); return r.count ?? 0
     })
 
+  if (want.has('quizresults'))
+    await step('quizresults', async () => { const r = await any('quiz_attempts'); ok(r); return r.count ?? 0 })
+
+  if (want.has('quizzes'))
+    await step('quizzes', async () => {
+      const { data, error } = await admin.from('quiz_questions').select('image_path')
+      if (error) throw error
+      await removeFiles('lampiran', (data || []).map((q) => q.image_path).filter(Boolean))
+      // soal, kunci jawaban, dan kelas quiz ikut terhapus otomatis (cascade)
+      const r = await any('quizzes'); ok(r); return r.count ?? 0
+    })
+
+  if (want.has('materials'))
+    await step('materials', async () => {
+      const { data, error } = await admin.from('materials').select('file_path')
+      if (error) throw error
+      await removeFiles('materi', (data || []).map((m) => m.file_path).filter(Boolean))
+      ok(await any('material_classes', 'material_id'))
+      const r = await any('materials'); ok(r); return r.count ?? 0
+    })
+
   if (want.has('passwords') && !want.has('students'))
     await step('passwords', async () => {
       const { data, error } = await admin.from('profiles').select('id,code').eq('role', 'student').eq('active', true)
@@ -90,6 +111,7 @@ export default async function handler(req, res) {
       for (let i = 0; i < ids.length; i += 10)
         await Promise.all(ids.slice(i, i + 10).map((id) => admin.auth.admin.deleteUser(id)))
       await admin.from('profiles').delete().eq('role', 'student')
+      for (let i = 0; i < ids.length; i += 100) await admin.from('seen_marks').delete().in('user_id', ids.slice(i, i + 100))
       return ids.length
     })
 
@@ -97,6 +119,8 @@ export default async function handler(req, res) {
     await step('classes', async () => {
       ok(await admin.from('profiles').update({ class_id: null }).eq('role', 'student'))
       ok(await any('assignment_classes', 'assignment_id'))
+      ok(await any('quiz_classes', 'quiz_id'))
+      ok(await any('material_classes', 'material_id'))
       const r = await any('classes'); ok(r); return r.count ?? 0
     })
 
