@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
@@ -7,18 +7,48 @@ import Shell, { I } from './Shell.jsx'
 import { useNotifs, NotifPopup } from './Notifs.jsx'
 import { loadSettings, DEFAULTS } from './brand.jsx'
 
+// Jika file tab gagal diunduh (biasanya karena baru ada versi baru), muat ulang halaman satu kali.
+const lazyRetry = (load) => lazy(() => load().catch((e) => {
+  try {
+    if (!sessionStorage.getItem('chunk-retry')) {
+      sessionStorage.setItem('chunk-retry', '1'); location.reload()
+      return new Promise(() => {})
+    }
+  } catch { /* abaikan */ }
+  throw e
+}))
+
 // Tab dimuat hanya saat dibuka, jadi layar pertama jauh lebih ringan.
-const Students = lazy(() => import('./Students.jsx'))
-const Tasks = lazy(() => import('./Tasks.jsx'))
-const Grading = lazy(() => import('./Grading.jsx'))
-const StudentTasks = lazy(() => import('./StudentTasks.jsx'))
-const Grades = lazy(() => import('./StudentTasks.jsx').then((m) => ({ default: m.Grades })))
-const Settings = lazy(() => import('./Settings.jsx'))
-const Calendar = lazy(() => import('./Calendar.jsx'))
-const Recap = lazy(() => import('./Recap.jsx'))
-const Materials = lazy(() => import('./Materials.jsx'))
-const StudentMaterials = lazy(() => import('./StudentMaterials.jsx'))
+const Students = lazyRetry(() => import('./Students.jsx'))
+const Tasks = lazyRetry(() => import('./Tasks.jsx'))
+const Grading = lazyRetry(() => import('./Grading.jsx'))
+const StudentTasks = lazyRetry(() => import('./StudentTasks.jsx'))
+const Grades = lazyRetry(() => import('./StudentTasks.jsx').then((m) => ({ default: m.Grades })))
+const Settings = lazyRetry(() => import('./Settings.jsx'))
+const Calendar = lazyRetry(() => import('./Calendar.jsx'))
+const Recap = lazyRetry(() => import('./Recap.jsx'))
+const Materials = lazyRetry(() => import('./Materials.jsx'))
+const StudentMaterials = lazyRetry(() => import('./StudentMaterials.jsx'))
 const Wait = <div className="empty">Memuat...</div>
+
+// Batas waktu supaya layar tidak menggantung selamanya saat server tidak merespons.
+const withTimeout = (p, ms = 15000) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
+
+// Jika satu halaman error, tampilkan pesan (bukan layar kosong).
+class Boundary extends Component {
+  state = { err: null }
+  static getDerivedStateFromError(err) { return { err } }
+  render() {
+    if (!this.state.err) return this.props.children
+    return (
+      <div className="empty">
+        <p>Halaman gagal dimuat.</p>
+        <button className="btn" onClick={() => location.reload()}>Muat ulang</button>
+      </div>
+    )
+  }
+}
 
 function ChangePassword({ onDone, code }) {
   const [pw, setPw] = useState('')
@@ -75,7 +105,7 @@ function Student({ profile, reload, s }) {
   ]
   return (
     <Shell s={s} profile={me} role="Siswa" items={items} tab={tab} setTab={go}>
-      <Suspense fallback={Wait}>
+      <Boundary key={tab}><Suspense fallback={Wait}>
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
       {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
@@ -94,7 +124,7 @@ function Student({ profile, reload, s }) {
         <button className="btn ghost" style={{ marginTop: 16 }}
           onClick={() => window.confirm('Keluar dari akun ini?') && supabase.auth.signOut()}>Keluar dari akun</button>
       </>)}
-      </Suspense>
+      </Suspense></Boundary>
     </Shell>
   )
 }
@@ -112,7 +142,7 @@ function Teacher({ profile, s, onSaved }) {
   ]
   return (
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
-      <Suspense fallback={Wait}>
+      <Boundary key={tab}><Suspense fallback={Wait}>
       {tab === 'dash' && <Dashboard profile={profile} go={setTab} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
@@ -120,7 +150,7 @@ function Teacher({ profile, s, onSaved }) {
       {tab === 'recap' && <Recap />}
       {tab === 'students' && <Students />}
       {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
-      </Suspense>
+      </Suspense></Boundary>
     </Shell>
   )
 }
@@ -139,24 +169,41 @@ export default function App() {
   }, [s])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    let off = false
+    withTimeout(supabase.auth.getSession())
+      .then(({ data }) => { if (!off) setSession(data.session) })
+      .catch(() => { if (!off) setState('error') })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, x) =>
       setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x)))
-    return () => sub.subscription.unsubscribe()
+    return () => { off = true; sub.subscription.unsubscribe() }
   }, [])
 
   async function loadProfile(x = session) {
     if (!x) { setProfile(null); setState('out'); return }
-    const { data } = await supabase.from('profiles').select('*').eq('id', x.user.id).maybeSingle()
-    if (!data || !data.active) {
-      await supabase.auth.signOut(); setProfile(null); setState('out'); return
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', x.user.id).maybeSingle())
+      // Gangguan jaringan/server BUKAN alasan untuk mengeluarkan pengguna.
+      if (error) throw error
+      if (!data || !data.active) {
+        await supabase.auth.signOut(); setProfile(null); setState('out'); return
+      }
+      try { sessionStorage.removeItem('chunk-retry') } catch { /* abaikan */ }
+      setProfile(data); setState('in')
+    } catch {
+      setState('error')
     }
-    setProfile(data); setState('in')
   }
 
   useEffect(() => { if (session !== undefined) loadProfile(session) }, [session?.user?.id])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
+  if (state === 'error') return (
+    <div className="center" style={{ flexDirection: 'column', gap: 12, textAlign: 'center', padding: 24 }}>
+      <div>Tidak bisa terhubung ke server. Periksa internet, lalu coba lagi.</div>
+      <button className="btn" onClick={() => location.reload()}>Coba lagi</button>
+    </div>
+  )
   if (state === 'out') return <Login s={s} />
   return profile.role === 'teacher'
     ? <Teacher profile={profile} s={s} onSaved={setS} />
