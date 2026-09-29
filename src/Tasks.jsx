@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import { callApi, fetchAll, copyText, listText, toLocalInput } from './util.js'
+import { callApi, fetchAll, copyText, listText, toLocalInput, compress } from './util.js'
 import GroupEditor from './GroupEditor.jsx'
+import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 
 const TYPES = { photo: 'Foto', text: 'Teks', both: 'Foto dan teks' }
 const fmt = (d) => d
@@ -29,6 +30,9 @@ function TaskForm({ profile, task, onDone, onCancel }) {
   const [file, setFile] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const newQ = () => ({ id: crypto.randomUUID(), text: '', image_path: null, file: null, preview: '' })
+  const [qs, setQs] = useState(() => (edit && task.questions?.length ? task.questions.map((q) => ({ ...q, file: null, preview: '' })) : [newQ()]))
+  const oldUrls = useQuestionUrls(edit ? task.questions : [])
 
   useEffect(() => {
     supabase.from('classes').select('id,name').order('name').then((r) => setClasses(r.data || []))
@@ -36,6 +40,13 @@ function TaskForm({ profile, task, onDone, onCancel }) {
   }, [])
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const setQ = (id, patch) => setQs(qs.map((q) => (q.id === id ? { ...q, ...patch } : q)))
+  const pickImg = (id, f) => {
+    if (!f) return
+    if (!f.type.startsWith('image/')) return setErr('File soal harus berupa gambar.')
+    setErr(''); setQ(id, { file: f, preview: URL.createObjectURL(f) })
+  }
+  const dropImg = (id) => setQ(id, { file: null, preview: '', image_path: null })
   const toggle = (id) => setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
 
   async function save() {
@@ -52,15 +63,29 @@ function TaskForm({ profile, task, onDone, onCancel }) {
         if (up.error) throw up.error
         attachment_path = path
       }
+      const questions = []
+      for (const q of qs) {
+        const text = q.text.trim()
+        if (!text && !q.file && !q.image_path) continue
+        let image_path = q.image_path || null
+        if (q.file) {
+          const blob = await compress(q.file, 1600, 0.8)
+          image_path = `${id}/q-${q.id}-${Date.now()}.jpg`
+          const up = await supabase.storage.from('lampiran').upload(image_path, blob, { contentType: 'image/jpeg' })
+          if (up.error) throw up.error
+        }
+        questions.push({ id: q.id, text, image_path })
+      }
       const due_at = f.due ? new Date(f.due).toISOString() : null
       if (edit) {
         await callApi('/api/task', { action: 'update', id, title: f.title, instructions: f.instructions, due_at,
-          answer_type: f.type, subject_id: f.subject, class_ids: picked, attachment_path })
+          answer_type: f.type, subject_id: f.subject, class_ids: picked, attachment_path, questions })
         return onDone()
       }
       const { error } = await supabase.from('assignments').insert({
         id, title: f.title.trim(), subject_id: f.subject, instructions: f.instructions.trim() || null,
         due_at, answer_type: f.type, attachment_path, created_by: profile.id, is_group: group,
+        questions: questions.length ? questions : null,
       })
       if (error) throw error
       const e2 = (await supabase.from('assignment_classes')
@@ -122,6 +147,34 @@ function TaskForm({ profile, task, onDone, onCancel }) {
       </>) : task.is_group && <p className="muted">Tugas kelompok. Atur kelompok dari halaman detail tugas.</p>}
     </section>
 
+    <section className="fsec">
+      <h3>Soal <span className="muted">opsional. Tiap soal punya kolom jawaban sendiri untuk siswa</span></h3>
+      {qs.map((q, i) => {
+        const img = q.preview || oldUrls[q.id]
+        return (
+          <div className="qbox" key={q.id}>
+            <div className="qtop">
+              <b>Soal {i + 1}</b>
+              {qs.length > 1 && <button type="button" className="qdel" onClick={() => setQs(qs.filter((x) => x.id !== q.id))}>Hapus soal</button>}
+            </div>
+            <label className="sr" htmlFor={'q' + q.id}>Teks soal {i + 1}</label>
+            <textarea id={'q' + q.id} rows="3" value={q.text} onChange={(e) => setQ(q.id, { text: e.target.value })}
+              placeholder={i === 0 ? 'Tulis soal. Contoh: Ceritakan apa yang terjadi pada gambar di bawah.' : 'Tulis soal'} />
+            {img && (
+              <div className="qprev">
+                <img src={img} alt={`Gambar soal ${i + 1}`} />
+                <button type="button" aria-label="Hapus gambar" onClick={() => dropImg(q.id)}>×</button>
+              </div>
+            )}
+            <label className="drop" htmlFor={'qi' + q.id}>{img ? 'Ganti gambar' : 'Tambah gambar (opsional)'}</label>
+            <input id={'qi' + q.id} type="file" accept="image/*" hidden
+              onChange={(e) => { pickImg(q.id, e.target.files[0]); e.target.value = '' }} />
+          </div>
+        )
+      })}
+      <button type="button" className="btn ghost" onClick={() => setQs([...qs, newQ()])}>+ Tambah soal</button>
+    </section>
+
     <details className="fsec more" open={edit && !!(task.instructions || task.attachment_path)}>
       <summary>Petunjuk dan lampiran <span className="muted">opsional</span></summary>
       <label className="sr" htmlFor="i">Petunjuk</label>
@@ -139,6 +192,7 @@ function TaskForm({ profile, task, onDone, onCancel }) {
 
 function Detail({ task, data, onBack, onEdit, onGroups, reload }) {
   const [note, setNote] = useState('')
+  const qurls = useQuestionUrls(task.questions)
   const cls = task.assignment_classes.map((x) => ({ id: x.class_id, name: x.classes?.name }))
   const subs = new Map(data.subs.filter((s) => s.assignment_id === task.id).map((s) => [s.student_id, s]))
 
@@ -163,6 +217,14 @@ function Detail({ task, data, onBack, onEdit, onGroups, reload }) {
     <h2>{task.title}</h2>
     <p className="muted">{task.subjects?.name && task.subjects.name + ' · '}Tenggat: {fmt(task.due_at)} · Jawaban: {TYPES[task.answer_type]}{task.is_group && ' · Kelompok'}{task.status === 'archived' && ' · Diarsipkan'}</p>
     {task.instructions && <p>{task.instructions}</p>}
+    {task.questions?.length > 0 && (
+      <details className="panel">
+        <summary><b>{task.questions.length} soal</b> <span className="muted">lihat</span></summary>
+        {task.questions.map((q, i) => (
+          <div className="qbox" key={q.id}><QuestionHead n={i + 1} q={q} url={qurls[q.id]} /></div>
+        ))}
+      </details>
+    )}
     <div className="picks">
       <button className="btn ghost" onClick={onEdit}>Ubah tugas</button>
       {task.is_group && <button className="btn ghost" onClick={onGroups}>Atur kelompok</button>}
@@ -202,7 +264,7 @@ export default function Tasks({ profile }) {
     try {
       const [a, subs, st] = await Promise.all([
         supabase.from('assignments')
-          .select('id,title,instructions,due_at,answer_type,status,is_group,attachment_path,subject_id,subjects(name),assignment_classes(class_id,classes(name))')
+          .select('id,title,instructions,due_at,answer_type,status,is_group,attachment_path,questions,subject_id,subjects(name),assignment_classes(class_id,classes(name))')
           .order('created_at', { ascending: false }),
         fetchAll(() => supabase.from('submissions').select('id,assignment_id,student_id,status,score,submitted_at,return_note').order('id')),
         supabase.from('profiles').select('id,full_name,class_id').eq('role', 'student').eq('active', true).order('full_name'),

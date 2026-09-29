@@ -63,20 +63,20 @@ export default async function handler(req, res) {
     if (!mem) return res.status(403).json({ error: 'Kamu tidak ada di kelompok ini' })
     const { data: g } = await admin.from('task_groups').select('id,leader_id').eq('id', mem.group_id).maybeSingle()
     if (g?.leader_id !== me.id) return res.status(403).json({ error: 'Hanya ketua kelompok yang bisa mengirim' })
-    const { data: mine } = await admin.from('submissions').select('id,text_answer,status,submitted_at').eq('assignment_id', aid).eq('student_id', me.id).maybeSingle()
+    const { data: mine } = await admin.from('submissions').select('id,text_answer,answers,status,submitted_at').eq('assignment_id', aid).eq('student_id', me.id).maybeSingle()
     if (!mine || mine.status !== 'submitted') return res.json({ ok: true, skipped: true })
-    const { data: photos } = await admin.from('submission_photos').select('path').eq('submission_id', mine.id)
+    const { data: photos } = await admin.from('submission_photos').select('path,question_id').eq('submission_id', mine.id)
     const { data: ms } = await admin.from('task_group_members').select('student_id').eq('group_id', g.id)
     let n = 0
     for (const { student_id } of (ms || []).filter((m) => m.student_id !== me.id)) {
       const { data: cur } = await admin.from('submissions').select('id,score').eq('assignment_id', aid).eq('student_id', student_id).maybeSingle()
       if (cur?.score != null) continue
       const up = await admin.from('submissions').upsert(
-        { assignment_id: aid, student_id, text_answer: mine.text_answer, status: 'submitted', submitted_at: mine.submitted_at, return_note: null },
+        { assignment_id: aid, student_id, text_answer: mine.text_answer, answers: mine.answers, status: 'submitted', submitted_at: mine.submitted_at, return_note: null },
         { onConflict: 'assignment_id,student_id' }).select('id').single()
       if (up.error) return fail(up.error, 'Gagal meneruskan ke anggota')
       await admin.from('submission_photos').delete().eq('submission_id', up.data.id)
-      if (photos?.length) await admin.from('submission_photos').insert(photos.map((p) => ({ submission_id: up.data.id, path: p.path })))
+      if (photos?.length) await admin.from('submission_photos').insert(photos.map((p) => ({ submission_id: up.data.id, path: p.path, question_id: p.question_id })))
       n++
     }
     return res.json({ ok: true, members: n })

@@ -38,3 +38,32 @@ export function toLocalInput(iso) {
 // Library Excel (~400 KB) hanya diunduh saat benar-benar dipakai (ekspor/impor).
 let xlsxP
 export const loadXlsx = () => (xlsxP ||= import('xlsx'))
+
+// Perkecil foto sebelum diunggah (hemat penyimpanan dan kuota).
+export async function compress(file, max = 1280, q = 0.7) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const k = Math.min(1, max / Math.max(bmp.width, bmp.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height)
+      bmp.close?.()
+      const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', q))
+      if (b) return b
+    } catch { /* lanjut ke cara lama */ }
+  }
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file)
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+      URL.revokeObjectURL(url)
+      c.toBlob((b) => (b ? res(b) : rej(new Error('Gagal memproses foto'))), 'image/jpeg', q)
+    }
+    img.onerror = () => rej(new Error('File itu bukan foto yang valid'))
+    img.src = url
+  })
+}

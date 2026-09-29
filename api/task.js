@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const { admin } = a
   const b = req.body || {}
   if (!b.id) return res.status(400).json({ error: 'ID tugas kosong' })
-  const { data: t } = await admin.from('assignments').select('id,attachment_path').eq('id', b.id).maybeSingle()
+  const { data: t } = await admin.from('assignments').select('id,attachment_path,questions').eq('id', b.id).maybeSingle()
   if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan' })
   const fail = (e, m) => res.status(500).json({ error: m + ': ' + (e.message || e) })
 
@@ -23,6 +23,14 @@ export default async function handler(req, res) {
       due_at: b.due_at ? new Date(b.due_at).toISOString() : null,
     }
     if (b.attachment_path) patch.attachment_path = b.attachment_path
+    let newQs
+    if (Array.isArray(b.questions)) {
+      newQs = b.questions.slice(0, 50).map((q) => ({
+        id: String(q.id || ''), text: String(q.text || '').trim().slice(0, 4000),
+        image_path: typeof q.image_path === 'string' && q.image_path ? q.image_path : null,
+      })).filter((q) => q.id && (q.text || q.image_path))
+      patch.questions = newQs.length ? newQs : null
+    }
     const u = await admin.from('assignments').update(patch).eq('id', t.id)
     if (u.error) return fail(u.error, 'Gagal menyimpan')
     await admin.from('assignment_classes').delete().eq('assignment_id', t.id)
@@ -30,6 +38,12 @@ export default async function handler(req, res) {
     if (i.error) return fail(i.error, 'Gagal menyimpan kelas')
     if (b.attachment_path && t.attachment_path && t.attachment_path !== b.attachment_path)
       await admin.storage.from('lampiran').remove([t.attachment_path])
+    if (newQs) {
+      // Hapus gambar soal lama yang sudah tidak dipakai.
+      const keep = new Set(newQs.map((q) => q.image_path).filter(Boolean))
+      const gone = (t.questions || []).map((q) => q.image_path).filter((p) => p && !keep.has(p))
+      if (gone.length) await admin.storage.from('lampiran').remove(gone)
+    }
     return res.json({ ok: true })
   }
 
@@ -49,7 +63,8 @@ export default async function handler(req, res) {
     await admin.from('assignment_classes').delete().eq('assignment_id', t.id)
     const d = await admin.from('assignments').delete().eq('id', t.id)
     if (d.error) return fail(d.error, 'Gagal menghapus')
-    if (t.attachment_path) await admin.storage.from('lampiran').remove([t.attachment_path])
+    const files = [t.attachment_path, ...(t.questions || []).map((q) => q.image_path)].filter(Boolean)
+    if (files.length) await admin.storage.from('lampiran').remove(files)
     return res.json({ ok: true })
   }
 

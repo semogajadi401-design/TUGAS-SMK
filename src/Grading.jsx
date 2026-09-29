@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { callApi, fetchAll, loadXlsx } from './util.js'
+import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 
 const QUICK = [50, 60, 70, 80, 90, 100]
 const TEMPLATES = ['Bagus sekali', 'Sudah baik', 'Perlu diperbaiki', 'Jawaban kurang lengkap', 'Foto kurang jelas, mohon kirim ulang', 'Kerjakan sesuai petunjuk']
@@ -15,7 +16,7 @@ function TaskList({ onOpen }) {
   useEffect(() => {
     (async () => {
       const [a, s] = await Promise.all([
-        supabase.from('assignments').select('id,title,due_at,status,answer_type,subjects(name)').order('created_at', { ascending: false }),
+        supabase.from('assignments').select('id,title,due_at,status,answer_type,questions,subjects(name)').order('created_at', { ascending: false }),
         fetchAll(() => supabase.from('submissions').select('id,assignment_id,score').eq('status', 'submitted').order('id')),
       ])
       const cnt = new Map()
@@ -56,16 +57,17 @@ function GradeOne({ task, sub, ids, label, pos, total, onSave, onReturned, onPre
   const [score, setScore] = useState(sub.score ?? '')
   const [fb, setFb] = useState(sub.feedback || '')
   const [zoom, setZoom] = useState('')
+  const qurls = useQuestionUrls(task.questions)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   useEffect(() => {
     setScore(sub.score ?? ''); setFb(sub.feedback || ''); setErr(''); setPhotos([])
     ;(async () => {
-      const { data: l } = await supabase.from('submission_photos').select('id,path').eq('submission_id', sub.id)
+      const { data: l } = await supabase.from('submission_photos').select('id,path,question_id').eq('submission_id', sub.id)
       if (l?.length) {
         const { data } = await supabase.storage.from('jawaban').createSignedUrls(l.map((p) => p.path), 3600)
-        setPhotos((data || []).map((d) => d.signedUrl))
+        setPhotos(l.map((p, i) => ({ url: data?.[i]?.signedUrl, q: p.question_id || null })).filter((p) => p.url))
       }
     })()
   }, [sub.id])
@@ -103,17 +105,36 @@ function GradeOne({ task, sub, ids, label, pos, total, onSave, onReturned, onPre
     </div>
     {late && <div className="banner">Dikirim setelah tenggat.</div>}
 
-    {task.answer_type !== 'text' && (<>
-      <h3 className="sec">Foto jawaban</h3>
-      {sub.photos_cleaned && <p className="muted">Foto sudah dibersihkan.</p>}
-      {!sub.photos_cleaned && !photos.length && <p className="muted">Tidak ada foto.</p>}
-      <div className="photos">
-        {photos.map((u) => <div className="ph" key={u}><img src={u} alt="Foto jawaban" loading="lazy" decoding="async" onClick={() => setZoom(u)} /></div>)}
-      </div>
-    </>)}
-    {task.answer_type !== 'photo' && (<>
-      <h3 className="sec">Jawaban teks</h3>
-      <div className="instr">{sub.text_answer?.trim() || <span className="muted">Tidak ada teks.</span>}</div>
+    {task.questions?.length ? task.questions.map((q, i) => {
+      const mine = photos.filter((p) => p.q === q.id)
+      const txt = (sub.answers?.[q.id] || '').trim()
+      return (
+        <div className="qcard" key={q.id}>
+          <QuestionHead n={i + 1} q={q} url={qurls[q.id]} onZoom={setZoom} />
+          <div className="qlabel">Jawaban siswa</div>
+          {task.answer_type !== 'text' && (<>
+            {sub.photos_cleaned && !mine.length && <p className="muted">Foto sudah dibersihkan.</p>}
+            <div className="photos">
+              {mine.map((p) => <div className="ph" key={p.url}><img src={p.url} alt="Foto jawaban" loading="lazy" decoding="async" onClick={() => setZoom(p.url)} /></div>)}
+            </div>
+          </>)}
+          {task.answer_type !== 'photo' && <div className="instr">{txt || <span className="muted">Tidak ada jawaban teks.</span>}</div>}
+          {task.answer_type === 'photo' && !mine.length && !sub.photos_cleaned && <p className="muted">Tidak ada foto.</p>}
+        </div>
+      )
+    }) : (<>
+      {task.answer_type !== 'text' && (<>
+        <h3 className="sec">Foto jawaban</h3>
+        {sub.photos_cleaned && <p className="muted">Foto sudah dibersihkan.</p>}
+        {!sub.photos_cleaned && !photos.length && <p className="muted">Tidak ada foto.</p>}
+        <div className="photos">
+          {photos.map((p) => <div className="ph" key={p.url}><img src={p.url} alt="Foto jawaban" loading="lazy" decoding="async" onClick={() => setZoom(p.url)} /></div>)}
+        </div>
+      </>)}
+      {task.answer_type !== 'photo' && (<>
+        <h3 className="sec">Jawaban teks</h3>
+        <div className="instr">{sub.text_answer?.trim() || <span className="muted">Tidak ada teks.</span>}</div>
+      </>)}
     </>)}
 
     <h3 className="sec">Nilai</h3>
@@ -159,7 +180,7 @@ function ByTask({ task, onBack }) {
 
   async function load() {
     const { data } = await supabase.from('submissions')
-      .select('id,student_id,text_answer,status,submitted_at,score,feedback,photos_cleaned,profiles(full_name,classes(name))')
+      .select('id,student_id,text_answer,answers,status,submitted_at,score,feedback,photos_cleaned,profiles(full_name,classes(name))')
       .eq('assignment_id', task.id).eq('status', 'submitted')
     setSubs((data || []).sort((a, b) =>
       (a.profiles?.classes?.name || '').localeCompare(b.profiles?.classes?.name || '') ||

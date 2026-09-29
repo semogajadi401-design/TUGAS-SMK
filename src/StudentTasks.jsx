@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import { callApi } from './util.js'
+import { callApi, compress } from './util.js'
+import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 
 const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 function dueInfo(due) {
@@ -16,35 +17,8 @@ const fmt = (d) => new Date(d).toLocaleString('id-ID',
 const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x?.return_note ? 'revise' : x ? 'draft' : 'todo')
 const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
 const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto dan teks' }
-const MAX_PHOTOS = 6
-
-async function compress(file, max = 1280, q = 0.7) {
-  if (typeof createImageBitmap === 'function') {
-    try {
-      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-      const k = Math.min(1, max / Math.max(bmp.width, bmp.height))
-      const c = document.createElement('canvas')
-      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
-      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height)
-      bmp.close?.()
-      const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', q))
-      if (b) return b
-    } catch { /* lanjut ke cara lama */ }
-  }
-  return new Promise((res, rej) => {
-    const img = new Image(), url = URL.createObjectURL(file)
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height))
-      const c = document.createElement('canvas')
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
-      URL.revokeObjectURL(url)
-      c.toBlob((b) => (b ? res(b) : rej(new Error('Gagal memproses foto'))), 'image/jpeg', q)
-    }
-    img.onerror = () => rej(new Error('File itu bukan foto yang valid'))
-    img.src = url
-  })
-}
+const MAX_PHOTOS = 6 // tugas tanpa soal bernomor
+const MAX_PER_Q = 3 // per soal bernomor
 
 function List({ onOpen }) {
   const [rows, setRows] = useState(null)
@@ -101,6 +75,8 @@ function Detail({ id, profile, onBack }) {
   const [added, setAdded] = useState([])
   const [removed, setRemoved] = useState([])
   const [text, setText] = useState('')
+  const [answers, setAnswers] = useState({})
+  const [zoom, setZoom] = useState('')
   const [attach, setAttach] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -109,9 +85,9 @@ function Detail({ id, profile, onBack }) {
   async function load() {
     const [t, s] = await Promise.all([
       supabase.from('assignments').select('*').eq('id', id).single(),
-      supabase.from('submissions').select('*, submission_photos(id,path)').eq('assignment_id', id).maybeSingle(),
+      supabase.from('submissions').select('*, submission_photos(id,path,question_id)').eq('assignment_id', id).maybeSingle(),
     ])
-    setTask(t.data); setSub(s.data); setText(s.data?.text_answer || '')
+    setTask(t.data); setSub(s.data); setText(s.data?.text_answer || ''); setAnswers(s.data?.answers || {})
     if (t.data?.is_group) callApi('/api/group', { action: 'mine', assignment_id: id }).then(setGrp).catch(() => setGrp({ group: null, isLeader: false }))
     else setGrp(null)
     const list = s.data?.submission_photos || []
@@ -125,6 +101,7 @@ function Detail({ id, profile, onBack }) {
     }
   }
   useEffect(() => { load() }, [id])
+  const qurls = useQuestionUrls(task?.questions)
 
   if (!task || (task.is_group && grp === undefined)) return <div className="empty">Memuat...</div>
 
@@ -133,27 +110,38 @@ function Detail({ id, profile, onBack }) {
   const locked = viewer || graded || (sub?.status === 'submitted' && task.due_at && new Date() > new Date(task.due_at))
   const wantsPhoto = task.answer_type !== 'text' && !viewer
   const wantsText = task.answer_type !== 'photo'
-  const total = photos.filter((p) => !removed.includes(p)).length + added.length
+  const questions = task.questions || []
+  const hasQ = questions.length > 0
   const shownPhotos = photos.filter((p) => !removed.includes(p))
+  const total = shownPhotos.length + added.length
+  const countOf = (q) => shownPhotos.filter((p) => (p.question_id || null) === q).length + added.filter((a) => a.q === q).length
+  const answered = (q) => {
+    const t = (answers[q] || '').trim(), n = countOf(q)
+    return task.answer_type === 'photo' ? n > 0 : task.answer_type === 'text' ? !!t : n > 0 || !!t
+  }
   const di = dueInfo(task.due_at)
 
-  function pick(e) {
-    const files = [...e.target.files].slice(0, Math.max(0, MAX_PHOTOS - total))
-    setAdded([...added, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))])
+  function pick(e, q = null) {
+    const room = q ? MAX_PER_Q - countOf(q) : MAX_PHOTOS - total
+    const files = [...e.target.files].slice(0, Math.max(0, room))
+    setAdded([...added, ...files.map((file) => ({ file, q, url: URL.createObjectURL(file) }))])
     e.target.value = ''
   }
 
   async function save(submit) {
     setBusy(true); setMsg(null)
     try {
-      if (submit) {
+      if (submit && hasQ) {
+        const i = questions.findIndex((q) => !answered(q.id))
+        if (i >= 0) throw new Error(`Soal nomor ${i + 1} belum dijawab.`)
+      } else if (submit) {
         if (task.answer_type === 'photo' && !total) throw new Error('Tambahkan minimal satu foto sebelum mengirim.')
         if (task.answer_type === 'text' && !text.trim()) throw new Error('Isi jawaban teks sebelum mengirim.')
         if (task.answer_type === 'both' && !total && !text.trim()) throw new Error('Tambahkan foto atau jawaban teks sebelum mengirim.')
       }
       const status = submit ? 'submitted' : (sub?.status || 'draft')
       const { data: row, error } = await supabase.from('submissions')
-        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, status, ...(submit && sub?.return_note ? { return_note: null } : {}) },
+        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, answers: hasQ ? answers : null, status, ...(submit && sub?.return_note ? { return_note: null } : {}) },
           { onConflict: 'assignment_id,student_id' }).select('id').single()
       if (error) throw error
       if (removed.length) {
@@ -170,7 +158,7 @@ function Detail({ id, profile, onBack }) {
         return path
       }))
       if (paths.length) {
-        const ins = await supabase.from('submission_photos').insert(paths.map((path) => ({ submission_id: row.id, path })))
+        const ins = await supabase.from('submission_photos').insert(paths.map((path, i) => ({ submission_id: row.id, path, question_id: added[i].q })))
         if (ins.error) throw ins.error
       }
       if (submit && task.is_group && grp?.isLeader) {
@@ -185,6 +173,36 @@ function Detail({ id, profile, onBack }) {
         ? 'Tugas ini sudah terkunci (tenggat lewat atau sudah dinilai), jadi tidak bisa diubah.' : e.message })
     }
     setBusy(false)
+  }
+
+  // Kotak foto untuk satu soal (q) atau seluruh tugas (q = null).
+  function photoBox(q, max) {
+    const mine = shownPhotos.filter((p) => (p.question_id || null) === q)
+    const mineNew = added.filter((a) => a.q === q)
+    const n = mine.length + mineNew.length
+    return (<>
+      <div className="photos">
+        {mine.map((p) => (
+          <div className="ph" key={p.id}>
+            <img src={p.url} alt="Foto jawaban" loading="lazy" decoding="async" />
+            {!locked && <button aria-label="Hapus foto" onClick={() => setRemoved([...removed, p])}>×</button>}
+          </div>
+        ))}
+        {mineNew.map((a) => (
+          <div className="ph" key={a.url}>
+            <img src={a.url} alt="Foto baru" />
+            <button aria-label="Hapus foto" onClick={() => setAdded(added.filter((x) => x !== a))}>×</button>
+          </div>
+        ))}
+      </div>
+      {!locked && n < max && (
+        <div className="picks">
+          <label className="btn ghost">Ambil foto<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => pick(e, q)} /></label>
+          <label className="btn ghost">Pilih dari galeri<input type="file" accept="image/*" multiple hidden onChange={(e) => pick(e, q)} /></label>
+        </div>
+      )}
+      {!locked && <p className="muted">Maksimal {max} foto{q ? ' untuk soal ini' : ''}. Foto diperkecil otomatis sebelum diunggah.</p>}
+    </>)
   }
 
   return (<>
@@ -216,37 +234,35 @@ function Detail({ id, profile, onBack }) {
     )}
     {locked && !graded && <div className="banner">Tenggat sudah lewat, jawabanmu terkunci dan menunggu dinilai.</div>}
 
-    {wantsPhoto && (<>
-      <h3 className="sec">Foto jawaban</h3>
-      {sub?.photos_cleaned && <p className="muted">Foto sudah dibersihkan guru untuk menghemat penyimpanan. Nilaimu tetap tersimpan.</p>}
-      <div className="photos">
-        {shownPhotos.map((p) => (
-          <div className="ph" key={p.id}>
-            <img src={p.url} alt="Foto jawaban" loading="lazy" decoding="async" />
-            {!locked && <button aria-label="Hapus foto" onClick={() => setRemoved([...removed, p])}>×</button>}
-          </div>
-        ))}
-        {added.map((a, i) => (
-          <div className="ph" key={a.url}>
-            <img src={a.url} alt="Foto baru" />
-            <button aria-label="Hapus foto" onClick={() => setAdded(added.filter((_, j) => j !== i))}>×</button>
-          </div>
-        ))}
+    {hasQ ? questions.map((q, i) => (
+      <div className="qcard" key={q.id}>
+        <QuestionHead n={i + 1} q={q} url={qurls[q.id]} onZoom={setZoom} />
+        {wantsPhoto && photoBox(q.id, MAX_PER_Q)}
+        {wantsText && (<>
+          <label className="qlabel" htmlFor={'a' + q.id}>Jawaban soal {i + 1}</label>
+          <textarea id={'a' + q.id} rows="4" value={answers[q.id] || ''} disabled={locked}
+            onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Ketik jawabanmu di sini" />
+        </>)}
       </div>
-      {!locked && total < MAX_PHOTOS && (
-        <div className="picks">
-          <label className="btn ghost">Ambil foto<input type="file" accept="image/*" capture="environment" hidden onChange={pick} /></label>
-          <label className="btn ghost">Pilih dari galeri<input type="file" accept="image/*" multiple hidden onChange={pick} /></label>
-        </div>
-      )}
-      {!locked && <p className="muted">Maksimal {MAX_PHOTOS} foto. Foto diperkecil otomatis sebelum diunggah.</p>}
+    )) : (<>
+      {wantsPhoto && (<>
+        <h3 className="sec">Foto jawaban</h3>
+        {sub?.photos_cleaned && <p className="muted">Foto sudah dibersihkan guru untuk menghemat penyimpanan. Nilaimu tetap tersimpan.</p>}
+        {photoBox(null, MAX_PHOTOS)}
+      </>)}
+      {wantsText && (<>
+        <h3 className="sec">Jawaban teks</h3>
+        <textarea rows="6" value={text} disabled={locked} onChange={(e) => setText(e.target.value)}
+          placeholder="Ketik jawabanmu di sini" />
+      </>)}
     </>)}
-
-    {wantsText && (<>
-      <h3 className="sec">Jawaban teks</h3>
-      <textarea rows="6" value={text} disabled={locked} onChange={(e) => setText(e.target.value)}
-        placeholder="Ketik jawabanmu di sini" />
-    </>)}
+    {hasQ && sub?.photos_cleaned && <p className="muted">Foto jawaban sudah dibersihkan guru untuk menghemat penyimpanan. Nilaimu tetap tersimpan.</p>}
+    {zoom && (
+      <div className="lightbox" onClick={() => setZoom('')}>
+        <img src={zoom} alt="Gambar diperbesar" />
+        <button aria-label="Tutup" onClick={() => setZoom('')}>×</button>
+      </div>
+    )}
 
     {msg && <div className={msg.ok ? 'ok' : 'err'} role="status">{msg.t}</div>}
     {!locked && (sub?.status === 'submitted'

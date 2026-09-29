@@ -61,9 +61,9 @@ export default async function handler(req, res) {
 
   if (want.has('assignments'))
     await step('assignments', async () => {
-      const { data, error } = await admin.from('assignments').select('attachment_path')
+      const { data, error } = await admin.from('assignments').select('attachment_path,questions')
       if (error) throw error
-      await removeFiles('lampiran', (data || []).map((a) => a.attachment_path).filter(Boolean))
+      await removeFiles('lampiran', (data || []).flatMap((a) => [a.attachment_path, ...(a.questions || []).map((q) => q.image_path)]).filter(Boolean))
       ok(await any('assignment_classes', 'assignment_id'))
       const r = await any('assignments'); ok(r); return r.count ?? 0
     })
