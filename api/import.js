@@ -20,7 +20,12 @@ export default async function handler(req, res) {
   const { data: me } = await admin.from('profiles').select('role,active').eq('id', u.user.id).maybeSingle()
   if (me?.role !== 'teacher' || !me.active) return res.status(403).json({ error: 'Hanya guru yang boleh mengimpor' })
 
-  const { rows = [], dryRun = true } = req.body || {}
+  const { rows: raw = [], dryRun = true } = req.body || {}
+  if (!Array.isArray(raw) || raw.length > 2000) return res.status(400).json({ error: 'Data tidak valid atau lebih dari 2000 baris' })
+  const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim()
+  const rows = raw.map((r) => ({ nama: clean(r?.nama), kelas: clean(r?.kelas), kode: clean(r?.kode).replace(/\s/g, '').toUpperCase() }))
+  const localErr = (r) => !r.nama ? 'Nama kosong' : !r.kelas ? 'Kelas kosong'
+    : r.kode && !/^[A-Z0-9]{6,12}$/.test(r.kode) ? 'Kode harus 6-12 huruf/angka tanpa spasi' : ''
   const { data: classes } = await admin.from('classes').select('id,name')
   const { data: studs } = await admin.from('profiles').select('full_name,class_id,code').eq('role', 'student')
   const classByName = new Map((classes || []).map((c) => [c.name.toLowerCase(), c.id]))
@@ -30,6 +35,8 @@ export default async function handler(req, res) {
 
   const out = rows.map((r) => {
     const o = { ...r, status: 'ok', reason: '' }
+    const le = localErr(r)
+    if (le) return { ...o, status: 'error', reason: le }
     if (seen.has(key(r.nama, r.kelas))) return { ...o, status: 'skip', reason: 'Sudah terdaftar (nama dan kelas sama)' }
     if (r.kode && usedCodes.has(r.kode)) return { ...o, status: 'error', reason: 'Kode sudah dipakai siswa lain' }
     seen.add(key(r.nama, r.kelas))

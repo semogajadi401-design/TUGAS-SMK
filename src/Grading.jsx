@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from './supabase.js'
 
 const when = (d) => d ? new Date(d).toLocaleString('id-ID',
@@ -165,10 +166,20 @@ function ByTask({ task, onBack }) {
     load()
   }
 
+  function exportXlsx() {
+    const ws = XLSX.utils.aoa_to_sheet([['Nama', 'Kelas', 'Dikirim', 'Nilai', 'Komentar'],
+      ...subs.map((s) => [s.profiles?.full_name, s.profiles?.classes?.name || '', when(s.submitted_at), s.score ?? '', s.feedback || ''])])
+    ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 40 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Nilai')
+    XLSX.writeFile(wb, 'nilai-' + task.title.replace(/[^\w-]+/g, '_') + '.xlsx')
+  }
+
   const filters = [['wait', 'Belum dinilai'], ['done', 'Sudah dinilai'], ['all', 'Semua']]
   return (<>
     <button className="link" style={{ marginTop: 0 }} onClick={onBack}>Kembali</button>
     <h2>{task.title}</h2>
+    {subs.length > 0 && <button className="btn ghost" style={{ marginBottom: 12 }} onClick={exportXlsx}>Ekspor nilai ke Excel</button>}
     <div className="seg">
       {filters.map(([k, l]) => <button key={k} className={f === k ? 'on' : ''} onClick={() => setF(k)}>{l}</button>)}
     </div>

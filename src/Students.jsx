@@ -148,6 +148,75 @@ function ImportModal({ onClose }) {
   )
 }
 
+async function studentApi(body) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/student', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify(body),
+  })
+  const j = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(j.error || 'Gagal menghubungi server')
+  return j
+}
+
+function StudentRow({ s, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [edit, setEdit] = useState(false)
+  const [nama, setNama] = useState(s.full_name)
+  const [kelas, setKelas] = useState(s.classes?.name || '')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  async function run(body, ok, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return
+    setBusy(true); setMsg(null)
+    try { await studentApi({ id: s.id, ...body }); setMsg({ ok: true, t: ok }); await onChange(); setEdit(false) }
+    catch (x) { setMsg({ ok: false, t: x.message }) }
+    setBusy(false)
+  }
+
+  return (
+    <div className="panel" style={{ opacity: s.active ? 1 : 0.6 }}>
+      <div className="line" style={{ borderBottom: 0 }} onClick={() => setOpen(!open)}>
+        <div><b>{s.full_name}</b><div className="muted">{s.classes?.name} · Kode {s.code}</div></div>
+        {!s.active ? <span className="badge">Nonaktif</span>
+          : !s.password_changed && <span className="badge">Belum ganti password</span>}
+      </div>
+      {open && (<>
+        {edit ? (<>
+          <label htmlFor={'n' + s.id}>Nama</label>
+          <input id={'n' + s.id} value={nama} onChange={(e) => setNama(e.target.value)} />
+          <label htmlFor={'k' + s.id}>Kelas</label>
+          <input id={'k' + s.id} value={kelas} onChange={(e) => setKelas(e.target.value)} />
+          <button className="btn" disabled={busy} onClick={() => run({ action: 'update', nama, kelas }, 'Data siswa disimpan.')}>Simpan</button>
+          <button className="link" onClick={() => setEdit(false)}>Batal</button>
+        </>) : (
+          <div className="picks">
+            <button className="btn ghost" disabled={busy} onClick={() => setEdit(true)}>Ubah data</button>
+            <button className="btn ghost" disabled={busy}
+              onClick={() => run({ action: 'reset' }, 'Password dikembalikan ke kode ' + s.code + '.',
+                `Kembalikan password ${s.full_name} menjadi kode awal (${s.code})?`)}>Reset password</button>
+            <button className="btn ghost" disabled={busy}
+              onClick={() => run({ action: 'active', value: !s.active }, s.active ? 'Siswa dinonaktifkan.' : 'Siswa diaktifkan.',
+                s.active ? `Nonaktifkan ${s.full_name}? Siswa tidak bisa masuk lagi.` : '')}>
+              {s.active ? 'Nonaktifkan' : 'Aktifkan'}</button>
+          </div>
+        )}
+        {msg && <div className={msg.ok ? 'ok' : 'err'} role="status">{msg.t}</div>}
+      </>)}
+    </div>
+  )
+}
+
+function printCodes(list) {
+  const rows = list.map((s) => `<tr><td>${s.full_name}</td><td>${s.classes?.name || ''}</td><td><b>${s.code || ''}</b></td></tr>`).join('')
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.write(`<title>Kode siswa</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px;text-align:left}</style><h2>Daftar kode siswa</h2><table><tr><th>Nama</th><th>Kelas</th><th>Kode</th></tr>${rows}</table>`)
+  w.document.close(); w.print()
+}
+
 export default function Students() {
   const [list, setList] = useState(null)
   const [cls, setCls] = useState('')
@@ -174,12 +243,8 @@ export default function Students() {
     </select>
     {list === null && <div className="empty">Memuat...</div>}
     {list && !shown.length && <div className="empty">Belum ada siswa. Klik Impor siswa untuk memulai.</div>}
-    {shown.map((s) => (
-      <div className="row" key={s.id}>
-        <div><b>{s.full_name}</b><div className="muted">{s.classes?.name} · Kode {s.code}</div></div>
-        {!s.password_changed && <span className="badge">Belum ganti password</span>}
-      </div>
-    ))}
+    {shown.length > 0 && <button className="link" onClick={() => printCodes(shown.filter((x) => x.active))}>Cetak daftar kode</button>}
+    {shown.map((s) => <StudentRow key={s.id} s={s} onChange={load} />)}
     {open && <ImportModal onClose={(changed) => { setOpen(false); if (changed) load() }} />}
   </>)
 }

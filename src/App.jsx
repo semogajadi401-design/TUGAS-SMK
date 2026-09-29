@@ -10,7 +10,7 @@ import StudentTasks, { Grades } from './StudentTasks.jsx'
 import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
 import Shell, { I } from './Shell.jsx'
 
-function ChangePassword({ onDone }) {
+function ChangePassword({ onDone, code }) {
   const [pw, setPw] = useState('')
   const [msg, setMsg] = useState({ t: '', ok: false })
   const [busy, setBusy] = useState(false)
@@ -18,6 +18,7 @@ function ChangePassword({ onDone }) {
   async function submit(e) {
     e.preventDefault()
     if (pw.length < 6) return setMsg({ t: 'Password minimal 6 karakter.', ok: false })
+    if (code && pw.trim().toUpperCase() === code.toUpperCase()) return setMsg({ t: 'Password baru tidak boleh sama dengan kode awal.', ok: false })
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password: pw })
     if (error) setMsg({ t: 'Gagal mengganti password: ' + error.message, ok: false })
@@ -45,20 +46,22 @@ function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
   const [openId, setOpenId] = useState(null)
   const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
-  const items = [
+  const forced = !profile.password_changed
+  const items = forced ? [{ k: 'account', label: 'Akun', icon: I.user }] : [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
     { k: 'grades', label: 'Nilai', icon: I.star },
     { k: 'account', label: 'Akun', icon: I.user },
   ]
   return (
-    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
-      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
-      {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
-      {tab === 'grades' && <Grades />}
-      {tab === 'account' && (<>
+    <Shell s={s} profile={profile} role="Siswa" items={items} tab={forced ? 'account' : tab} setTab={go}>
+      {forced && <div className="banner">Demi keamanan, buat password baru dulu sebelum memakai aplikasi.</div>}
+      {!forced && tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {!forced && tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
+      {!forced && tab === 'grades' && <Grades />}
+      {(forced || tab === 'account') && (<>
         <h2>Ubah password</h2>
-        <ChangePassword onDone={reload} />
+        <ChangePassword onDone={reload} code={profile.code} />
         <button className="btn ghost" style={{ marginTop: 16 }}
           onClick={() => window.confirm('Keluar dari akun ini?') && supabase.auth.signOut()}>Keluar dari akun</button>
       </>)}
