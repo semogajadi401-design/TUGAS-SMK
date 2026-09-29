@@ -71,53 +71,70 @@ function TaskForm({ profile, task, onDone, onCancel }) {
     setBusy(false)
   }
 
-  return (<>
-    <button className="link" style={{ marginTop: 0 }} onClick={onCancel}>Kembali</button>
-    <h2>{edit ? 'Ubah tugas' : 'Tugas baru'}</h2>
-    <label htmlFor="t">Judul</label>
-    <input id="t" value={f.title} onChange={set('title')} placeholder="Contoh: Latihan soal bab 3" />
-    <label>Mata pelajaran</label>
-    <div className="checks">
-      {subjects.map((s) => (
-        <button key={s.id} type="button" className={f.subject === s.id ? 'on' : ''} onClick={() => setF({ ...f, subject: s.id })}>{s.name}</button>
-      ))}
-      {!subjects.length && <span className="muted">Belum ada mapel. Buat dulu di menu Pengaturan.</span>}
-    </div>
-    <label htmlFor="i">Petunjuk (opsional)</label>
-    <textarea id="i" rows="4" value={f.instructions} onChange={set('instructions')} />
-    <label htmlFor="d">Tenggat (opsional)</label>
-    <input id="d" type="datetime-local" value={f.due} onChange={set('due')} />
-    <label>Jenis jawaban siswa</label>
-    <div className="seg">
-      {Object.entries(TYPES).map(([k, l]) => (
-        <button key={k} type="button" className={f.type === k ? 'on' : ''} onClick={() => setF({ ...f, type: k })}>{l}</button>
-      ))}
-    </div>
-    {!edit ? (<>
-      <label>Cara mengerjakan</label>
-      <div className="seg">
-        <button type="button" className={!group ? 'on' : ''} onClick={() => setGroup(false)}>Sendiri-sendiri</button>
-        <button type="button" className={group ? 'on' : ''} onClick={() => setGroup(true)}>Berkelompok</button>
+  return (<div className="form">
+    <button className="back" onClick={onCancel}>Kembali</button>
+    <label className="sr" htmlFor="t">Judul tugas</label>
+    <input id="t" className="title-in" value={f.title} onChange={set('title')} placeholder={edit ? 'Judul tugas' : 'Judul tugas baru'} />
+
+    <section className="fsec">
+      <h3>Mata pelajaran</h3>
+      <div className="checks">
+        {subjects.map((s) => (
+          <button key={s.id} type="button" className={f.subject === s.id ? 'on' : ''} onClick={() => setF({ ...f, subject: s.id })}>{s.name}</button>
+        ))}
+        {!subjects.length && <span className="muted">Belum ada mapel. Buat dulu di menu Pengaturan.</span>}
       </div>
-      {group && <p className="muted" style={{ marginTop: -8 }}>Kelompok diatur setelah tugas dibuat. Satu nilai berlaku untuk semua anggota.</p>}
-    </>) : task.is_group && <p className="muted">Tugas berkelompok. Atur kelompok dari halaman detail tugas.</p>}
-    <label>Kelas tujuan</label>
-    <div className="checks">
-      {classes.map((c) => (
-        <button key={c.id} type="button" className={picked.includes(c.id) ? 'on' : ''} onClick={() => toggle(c.id)}>{c.name}</button>
-      ))}
-      {!classes.length && <span className="muted">Belum ada kelas. Impor siswa dulu.</span>}
+    </section>
+
+    <section className="fsec">
+      <div className="fhead">
+        <h3>Kelas tujuan</h3>
+        {classes.length > 1 && (
+          <button type="button" className="mini" onClick={() => setPicked(picked.length === classes.length ? [] : classes.map((c) => c.id))}>
+            {picked.length === classes.length ? 'Kosongkan' : 'Pilih semua'}
+          </button>
+        )}
+      </div>
+      <div className="checks">
+        {classes.map((c) => (
+          <button key={c.id} type="button" className={picked.includes(c.id) ? 'on' : ''} onClick={() => toggle(c.id)}>{c.name}</button>
+        ))}
+        {!classes.length && <span className="muted">Belum ada kelas. Impor siswa dulu.</span>}
+      </div>
+    </section>
+
+    <section className="fsec">
+      <h3><label htmlFor="d">Tenggat</label></h3>
+      <input id="d" type="datetime-local" value={f.due} onChange={set('due')} />
+      <h3>Jawaban siswa</h3>
+      <div className="seg">
+        {Object.entries(TYPES).map(([k, l]) => (
+          <button key={k} type="button" className={f.type === k ? 'on' : ''} onClick={() => setF({ ...f, type: k })}>{l}</button>
+        ))}
+      </div>
+      {!edit ? (<>
+        <h3>Cara mengerjakan</h3>
+        <div className="seg">
+          <button type="button" className={!group ? 'on' : ''} onClick={() => setGroup(false)}>Sendiri</button>
+          <button type="button" className={group ? 'on' : ''} onClick={() => setGroup(true)}>Kelompok</button>
+        </div>
+        {group && <p className="muted">Kelompok diatur setelah tugas dibuat. Satu nilai berlaku untuk semua anggota.</p>}
+      </>) : task.is_group && <p className="muted">Tugas kelompok. Atur kelompok dari halaman detail tugas.</p>}
+    </section>
+
+    <details className="fsec more" open={edit && !!(task.instructions || task.attachment_path)}>
+      <summary>Petunjuk dan lampiran <span className="muted">opsional</span></summary>
+      <label className="sr" htmlFor="i">Petunjuk</label>
+      <textarea id="i" rows="4" value={f.instructions} onChange={set('instructions')} placeholder="Tulis petunjuk pengerjaan untuk siswa" />
+      <label className="drop" htmlFor="a">{file ? file.name : edit && task.attachment_path ? 'Ganti lampiran' : 'Pilih file lampiran, maks 10 MB'}</label>
+      <input id="a" type="file" hidden onChange={(e) => setFile(e.target.files[0] || null)} />
+    </details>
+
+    {err && <div className="err" role="alert">{err}</div>}
+    <div className="actions">
+      <button className="btn" onClick={save} disabled={busy}>{busy ? 'Menyimpan...' : edit ? 'Simpan perubahan' : 'Kirim ke kelas'}</button>
     </div>
-    {classes.length > 1 && (
-      <button className="link" style={{ marginTop: 0 }} onClick={() => setPicked(picked.length === classes.length ? [] : classes.map((c) => c.id))}>
-        {picked.length === classes.length ? 'Kosongkan pilihan' : 'Pilih semua kelas'}
-      </button>
-    )}
-    <label htmlFor="a" style={{ marginTop: 8 }}>{edit && task.attachment_path ? 'Ganti lampiran (kosongkan jika tidak diganti)' : 'Lampiran (opsional, maks 10 MB)'}</label>
-    <input id="a" type="file" onChange={(e) => setFile(e.target.files[0] || null)} />
-    {err && <div className="err">{err}</div>}
-    <button className="btn" onClick={save} disabled={busy}>{busy ? 'Menyimpan...' : edit ? 'Simpan perubahan' : 'Kirim tugas ke kelas'}</button>
-  </>)
+  </div>)
 }
 
 function Detail({ task, data, onBack, onEdit, onGroups, reload }) {
