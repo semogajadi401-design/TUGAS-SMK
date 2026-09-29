@@ -372,3 +372,34 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
   .login .card{margin:0;width:400px;flex:none}
 }
 @media (prefers-reduced-motion:reduce){.lg-msg{animation:none}.lg-dots button{transition:none}}
+
+/* ---- Gerak latar login ---- */
+.fx{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.blob{position:absolute;border-radius:50%;will-change:transform}
+.b1{width:62vmax;height:62vmax;left:-18vmax;top:-14vmax;opacity:.5;
+  background:radial-gradient(circle,color-mix(in srgb,var(--board) 65%,#5fe0c0 35%),transparent 66%);animation:d1 24s ease-in-out infinite alternate}
+.b2{width:46vmax;height:46vmax;right:-12vmax;bottom:-16vmax;opacity:.38;
+  background:radial-gradient(circle,color-mix(in srgb,var(--chalk) 60%,transparent),transparent 66%);animation:d2 28s ease-in-out infinite alternate}
+.b3{width:32vmax;height:32vmax;left:38%;top:30%;opacity:.16;
+  background:radial-gradient(circle,#fff,transparent 66%);animation:d3 20s ease-in-out infinite alternate}
+@keyframes d1{to{transform:translate(12vmax,10vmax) scale(1.15)}}
+@keyframes d2{to{transform:translate(-14vmax,-8vmax) scale(1.2)}}
+@keyframes d3{to{transform:translate(-10vmax,8vmax) scale(.8)}}
+.spark{position:absolute;bottom:-12px;left:var(--x);width:var(--s);height:var(--s);border-radius:50%;opacity:0;
+  background:rgba(255,255,255,.75);box-shadow:0 0 10px 2px rgba(255,255,255,.3);animation:rise var(--d) linear var(--t) infinite}
+.spark.gold{background:var(--chalk);box-shadow:0 0 12px 3px color-mix(in srgb,var(--chalk) 45%,transparent)}
+@keyframes rise{0%{transform:translate(0,0);opacity:0}12%{opacity:.85}88%{opacity:.5}100%{transform:translate(var(--dx),-105vh);opacity:0}}
+.sway{animation:sway 18s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:translate(-26px,10px)}50%{transform:translate(30px,-16px)}}
+.streak{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-dasharray:60 940;filter:drop-shadow(0 0 6px rgba(255,255,255,.6));
+  animation:streak 10s linear infinite}
+@keyframes streak{from{stroke-dashoffset:60}to{stroke-dashoffset:-1000}}
+.ring{transform-box:fill-box;transform-origin:center;animation:ringp 8s ease-in-out infinite}
+@keyframes ringp{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.07);opacity:.4}}
+.orbit{transform-box:view-box;transform-origin:1190px 180px;animation:spin 28s linear infinite}
+.orbit.rev{animation-duration:40s;animation-direction:reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tri{animation:tri 14s ease-in-out infinite alternate}
+.tri.b{animation-duration:19s}
+@keyframes tri{to{transform:translateY(-26px)}}
+@media (prefers-reduced-motion:reduce){.blob,.spark,.sway,.streak,.ring,.orbit,.tri{animation:none}.spark{display:none}}
