@@ -52,6 +52,13 @@ function Student({ profile, reload, s }) {
   const [openId, setOpenId] = useState(null)
   const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
   const nt = useNotifs()
+  const [kelas, setKelas] = useState('')
+  useEffect(() => {
+    if (!profile.class_id) return
+    supabase.from('classes').select('name').eq('id', profile.class_id).maybeSingle()
+      .then((r) => setKelas(r.data?.name || ''))
+  }, [profile.class_id])
+  const me = { ...profile, kelas }
   useEffect(() => { if (['tasks', 'materials', 'grades'].includes(tab)) nt.markSeen(tab) }, [tab])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
@@ -62,14 +69,20 @@ function Student({ profile, reload, s }) {
     { k: 'account', label: 'Akun', icon: I.user },
   ]
   return (
-    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
+    <Shell s={s} profile={me} role="Siswa" items={items} tab={tab} setTab={go}>
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
-      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
       {tab === 'materials' && <StudentMaterials />}
       {tab === 'calendar' && <Calendar onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
+        <h2>Profil saya</h2>
+        <dl className="prof">
+          <div><dt>Nama</dt><dd>{me.full_name}</dd></div>
+          <div><dt>Kelas</dt><dd>{kelas || 'Belum ada kelas'}</dd></div>
+          <div><dt>Username (kode masuk)</dt><dd>{me.code || '-'}</dd></div>
+        </dl>
         <h2>Ubah password</h2>
         <ChangePassword onDone={reload} code={profile.code} />
         <button className="btn ghost" style={{ marginTop: 16 }}
