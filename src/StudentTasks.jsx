@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
+import { callApi } from './util.js'
 
 const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 function dueInfo(due) {
@@ -12,8 +13,8 @@ function dueInfo(due) {
 }
 const fmt = (d) => new Date(d).toLocaleString('id-ID',
   { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
-const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x ? 'draft' : 'todo')
-const LABEL = { todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
+const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x?.return_note ? 'revise' : x ? 'draft' : 'todo')
+const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
 const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto dan teks' }
 const MAX_PHOTOS = 6
 
@@ -43,7 +44,7 @@ function List({ onOpen }) {
       const [a, s] = await Promise.all([
         supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active')
           .order('due_at', { ascending: true, nullsFirst: false }),
-        supabase.from('submissions').select('assignment_id,status,score'),
+        supabase.from('submissions').select('assignment_id,status,score,return_note'),
       ])
       const m = new Map((s.data || []).map((x) => [x.assignment_id, x]))
       setRows((a.data || []).map((t) => ({ ...t, st: stateOf(m.get(t.id)) })))
@@ -51,7 +52,7 @@ function List({ onOpen }) {
   }, [])
 
   const filters = [['todo', 'Belum'], ['sent', 'Dikirim'], ['graded', 'Dinilai'], ['all', 'Semua']]
-  const match = (r) => f === 'all' || (f === 'todo' ? r.st === 'todo' || r.st === 'draft' : r.st === f)
+  const match = (r) => f === 'all' || (f === 'todo' ? r.st === 'todo' || r.st === 'draft' || r.st === 'revise' : r.st === f)
   const mapel = [...new Set((rows || []).map((r) => r.subjects?.name).filter(Boolean))].sort()
   const shown = (rows || []).filter(match).filter((r) => !sj || r.subjects?.name === sj)
 
@@ -72,7 +73,7 @@ function List({ onOpen }) {
       return (
         <button className="task" key={t.id} onClick={() => onOpen(t.id)}>
           <div><b>{t.title}</b><div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}</div></div>
-          {t.st === 'todo' || t.st === 'draft'
+          {t.st === 'todo' || t.st === 'draft' || t.st === 'revise'
             ? <span className={'chip ' + di.c}>{di.t}</span>
             : <span className={'chip ' + (t.st === 'graded' ? 'graded' : 'sent')}>{LABEL[t.st]}</span>}
         </button>
@@ -91,6 +92,7 @@ function Detail({ id, profile, onBack }) {
   const [attach, setAttach] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [grp, setGrp] = useState(undefined)
 
   async function load() {
     const [t, s] = await Promise.all([
@@ -98,6 +100,8 @@ function Detail({ id, profile, onBack }) {
       supabase.from('submissions').select('*, submission_photos(id,path)').eq('assignment_id', id).maybeSingle(),
     ])
     setTask(t.data); setSub(s.data); setText(s.data?.text_answer || '')
+    if (t.data?.is_group) callApi('/api/group', { action: 'mine', assignment_id: id }).then(setGrp).catch(() => setGrp({ group: null, isLeader: false }))
+    else setGrp(null)
     const list = s.data?.submission_photos || []
     if (list.length) {
       const { data } = await supabase.storage.from('jawaban').createSignedUrls(list.map((p) => p.path), 3600)
@@ -110,11 +114,12 @@ function Detail({ id, profile, onBack }) {
   }
   useEffect(() => { load() }, [id])
 
-  if (!task) return <div className="empty">Memuat...</div>
+  if (!task || (task.is_group && grp === undefined)) return <div className="empty">Memuat...</div>
 
   const graded = sub?.score != null
-  const locked = graded || (sub?.status === 'submitted' && task.due_at && new Date() > new Date(task.due_at))
-  const wantsPhoto = task.answer_type !== 'text'
+  const viewer = !!task.is_group && !grp?.isLeader
+  const locked = viewer || graded || (sub?.status === 'submitted' && task.due_at && new Date() > new Date(task.due_at))
+  const wantsPhoto = task.answer_type !== 'text' && !viewer
   const wantsText = task.answer_type !== 'photo'
   const total = photos.filter((p) => !removed.includes(p)).length + added.length
   const shownPhotos = photos.filter((p) => !removed.includes(p))
@@ -136,7 +141,7 @@ function Detail({ id, profile, onBack }) {
       }
       const status = submit ? 'submitted' : (sub?.status || 'draft')
       const { data: row, error } = await supabase.from('submissions')
-        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, status },
+        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, status, ...(submit && sub?.return_note ? { return_note: null } : {}) },
           { onConflict: 'assignment_id,student_id' }).select('id').single()
       if (error) throw error
       if (removed.length) {
@@ -150,6 +155,10 @@ function Detail({ id, profile, onBack }) {
         if (up.error) throw up.error
         const ins = await supabase.from('submission_photos').insert({ submission_id: row.id, path })
         if (ins.error) throw ins.error
+      }
+      if (submit && task.is_group && grp?.isLeader) {
+        try { await callApi('/api/group', { action: 'sync', assignment_id: id }) }
+        catch { throw new Error('Jawabanmu tersimpan, tapi belum diteruskan ke anggota kelompok. Tekan tombol simpan sekali lagi.') }
       }
       setAdded([]); setRemoved([])
       await load()
@@ -172,6 +181,16 @@ function Detail({ id, profile, onBack }) {
     {task.instructions && <p className="instr">{task.instructions}</p>}
     {attach && <a className="btn ghost attach" href={attach} target="_blank" rel="noreferrer">Buka lampiran dari guru</a>}
 
+    {task.is_group && (
+      <div className="banner">
+        {!grp?.group ? 'Ini tugas kelompok, tapi kamu belum dimasukkan ke kelompok. Hubungi gurumu.'
+          : grp.isLeader ? `Tugas kelompok ${grp.group.name}. Jawaban yang kamu kirim berlaku untuk semua anggota: ${grp.group.members.join(', ')}.`
+          : `Tugas kelompok ${grp.group.name}. Yang mengirim jawaban adalah ketua: ${grp.group.leader_name}.`}
+      </div>
+    )}
+    {sub?.return_note && sub.status !== 'submitted' && !graded && (
+      <div className="banner"><b>Guru meminta perbaikan:</b> {sub.return_note}</div>
+    )}
     {graded && (
       <div className="result">
         <div className="big">{sub.score}</div>

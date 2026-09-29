@@ -22,3 +22,8 @@ Tabel: `profiles` (id, full_name, role, class_id, code, active, password_changed
 Bucket: `lampiran`, `jawaban`, `logo`. Fungsi RPC: `mark_password_changed`, `storage_usage_bytes`.
 Mapel: jalankan `supabase/mapel.sql` sekali di SQL Editor (tabel `subjects` + kolom `assignments.subject_id`).
 Simpan skema dan RLS policy Anda sebagai file SQL di `supabase/` supaya bisa dibuat ulang.
+
+## Fitur tambahan
+Jalankan `supabase/mapel.sql` lalu `supabase/fitur-baru.sql` (jawaban dikembalikan, tugas kelompok).
+Variabel Vercel tambahan: `CRON_SECRET` (bebas, untuk cadangan mingguan otomatis; jadwal ada di `vercel.json`).
+Endpoint: `/api/task` (ubah/hapus tugas), `/api/group` (kelompok), `/api/backup` (cadangan Excel).

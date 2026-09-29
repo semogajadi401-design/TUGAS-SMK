@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from './supabase.js'
 import Subjects from './Subjects.jsx'
 import ResetData from './ResetData.jsx'
+import Backup from './Backup.jsx'
 
 export const DEFAULTS = { school_name: 'Tugas Sekolah', logo_url: '', logo_path: '', color: '#0f5c4d' }
 
@@ -106,6 +107,7 @@ export default function Settings({ s, onSaved }) {
     <button className="btn" onClick={save} disabled={busy}>{busy ? 'Menyimpan...' : 'Simpan'}</button>
     <div style={{ height: 24 }} />
     <Subjects />
+    <Backup />
     <ResetData />
   </>)
 }

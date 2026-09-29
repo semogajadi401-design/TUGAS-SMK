@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from './supabase.js'
+import { callApi } from './util.js'
+
+const QUICK = [50, 60, 70, 80, 90, 100]
+const TEMPLATES = ['Bagus sekali', 'Sudah baik', 'Perlu diperbaiki', 'Jawaban kurang lengkap', 'Foto kurang jelas, mohon kirim ulang', 'Kerjakan sesuai petunjuk']
 
 const when = (d) => d ? new Date(d).toLocaleString('id-ID',
   { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
@@ -45,7 +49,7 @@ function TaskList({ onOpen }) {
 }
 
 /* ---------- Menilai satu siswa ---------- */
-function GradeOne({ task, sub, pos, total, onSave, onPrev, onNext, onClose }) {
+function GradeOne({ task, sub, ids, label, pos, total, onSave, onReturned, onPrev, onNext, onClose }) {
   const [photos, setPhotos] = useState([])
   const [score, setScore] = useState(sub.score ?? '')
   const [fb, setFb] = useState(sub.feedback || '')
@@ -69,17 +73,29 @@ function GradeOne({ task, sub, pos, total, onSave, onPrev, onNext, onClose }) {
     if (score === '' || isNaN(n) || n < 0 || n > 100) return setErr('Isi nilai antara 0 sampai 100.')
     setBusy(true); setErr('')
     const feedback = fb.trim() || null
-    const { error } = await supabase.from('submissions').update({ score: n, feedback }).eq('id', sub.id)
+    const { error } = await supabase.from('submissions').update({ score: n, feedback }).in('id', ids || [sub.id])
     setBusy(false)
     if (error) return setErr('Gagal menyimpan: ' + error.message)
-    onSave({ ...sub, score: n, feedback }, goNext)
+    onSave({ ...sub, score: n, feedback }, goNext, ids || [sub.id])
+  }
+
+  async function sendBack() {
+    if (!fb.trim()) return setErr('Tulis alasan perbaikan di kolom komentar dulu.')
+    if (!window.confirm('Kembalikan jawaban ini ke siswa untuk diperbaiki? Nilainya (jika ada) dikosongkan.')) return
+    setBusy(true); setErr('')
+    const list = ids || [sub.id]
+    const { error } = await supabase.from('submissions')
+      .update({ status: 'draft', return_note: fb.trim(), score: null, feedback: null }).in('id', list)
+    setBusy(false)
+    if (error) return setErr('Gagal mengembalikan: ' + error.message)
+    onReturned(list)
   }
 
   const late = task.due_at && sub.submitted_at && new Date(sub.submitted_at) > new Date(task.due_at)
   return (<>
     <button className="link" style={{ marginTop: 0 }} onClick={onClose}>Kembali ke daftar</button>
     <div className="who">
-      <div><h2 style={{ margin: 0 }}>{sub.profiles?.full_name}</h2>
+      <div><h2 style={{ margin: 0 }}>{label || sub.profiles?.full_name}</h2>
         <span className="muted">{sub.profiles?.classes?.name} · dikirim {when(sub.submitted_at)}</span></div>
       <span className="chip">{pos + 1} / {total}</span>
     </div>
@@ -102,8 +118,14 @@ function GradeOne({ task, sub, pos, total, onSave, onPrev, onNext, onClose }) {
     <label htmlFor="sc">Nilai (0-100)</label>
     <input id="sc" type="number" inputMode="decimal" min="0" max="100" step="any" value={score}
       onChange={(e) => setScore(e.target.value)} />
+    <div className="checks">
+      {QUICK.map((v) => <button key={v} type="button" className={String(score) === String(v) ? 'on' : ''} onClick={() => setScore(String(v))}>{v}</button>)}
+    </div>
     <label htmlFor="fb">Komentar untuk siswa (opsional)</label>
     <textarea id="fb" rows="3" value={fb} onChange={(e) => setFb(e.target.value)} />
+    <div className="checks">
+      {TEMPLATES.map((t) => <button key={t} type="button" onClick={() => setFb(fb.trim() ? fb.trim().replace(/[.]*$/, '') + '. ' + t : t)}>{t}</button>)}
+    </div>
     {err && <div className="err">{err}</div>}
     <button className="btn" disabled={busy} onClick={() => save(true)}>
       {busy ? 'Menyimpan...' : pos + 1 < total ? 'Simpan & berikutnya' : 'Simpan'}
@@ -113,6 +135,7 @@ function GradeOne({ task, sub, pos, total, onSave, onPrev, onNext, onClose }) {
       <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan saja</button>
       <button className="btn ghost" disabled={pos + 1 >= total} onClick={onNext}>Lewati</button>
     </div>
+    <button className="link" disabled={busy} onClick={sendBack}>Minta siswa memperbaiki (kembalikan jawaban)</button>
     {zoom && (
       <div className="lightbox" onClick={() => setZoom('')}>
         <img src={zoom} alt="Foto diperbesar" />
@@ -130,6 +153,7 @@ function ByTask({ task, onBack }) {
   const [idx, setIdx] = useState(null)
   const [queue, setQueue] = useState([])
   const [note, setNote] = useState('')
+  const [g, setG] = useState({})
 
   async function load() {
     const { data } = await supabase.from('submissions')
@@ -139,22 +163,35 @@ function ByTask({ task, onBack }) {
       (a.profiles?.classes?.name || '').localeCompare(b.profiles?.classes?.name || '') ||
       (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || '')))
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    if (task.is_group) callApi('/api/group', { action: 'list', assignment_id: task.id }).then((j) => {
+      const m = {}; (j.groups || []).forEach((gr) => gr.members.forEach((id) => { m[id] = gr })); setG(m)
+    }).catch(() => {})
+  }, [])
   if (!subs) return <div className="empty">Memuat...</div>
 
+  // Tugas kelompok: tampilkan satu baris per kelompok (jawaban ketua), nilai berlaku untuk semua anggota.
+  const rep = (s) => !task.is_group || !g[s.student_id] || g[s.student_id].leader_id === s.student_id
+  const idsOf = (s) => g[s.student_id] && task.is_group
+    ? subs.filter((x) => g[s.student_id].members.includes(x.student_id)).map((x) => x.id) : [s.id]
+  const nameOf = (s) => (task.is_group && g[s.student_id] ? g[s.student_id].name : s.profiles?.full_name)
+
   const classes = [...new Set(subs.map((s) => s.profiles?.classes?.name).filter(Boolean))]
-  const shown = subs.filter((s) =>
+  const shown = subs.filter((s) => rep(s) &&
     (!cls || s.profiles?.classes?.name === cls) &&
     (f === 'all' || (f === 'wait' ? s.score == null : s.score != null)))
   const byId = new Map(subs.map((s) => [s.id, s]))
 
   if (idx !== null) {
     const cur = byId.get(queue[idx])
-    return <GradeOne key={cur.id} task={task} sub={cur} pos={idx} total={queue.length}
+    return <GradeOne key={cur.id} task={task} sub={cur} ids={idsOf(cur)} label={task.is_group && g[cur.student_id] ? nameOf(cur) : undefined}
+      pos={idx} total={queue.length}
       onClose={() => setIdx(null)}
       onPrev={() => setIdx(idx - 1)} onNext={() => setIdx(idx + 1)}
-      onSave={(upd, goNext) => {
-        setSubs(subs.map((s) => (s.id === upd.id ? upd : s)))
+      onReturned={(list) => { setSubs(subs.filter((s) => !list.includes(s.id))); setIdx(null); setNote('Jawaban dikembalikan ke siswa untuk diperbaiki.') }}
+      onSave={(upd, goNext, list) => {
+        setSubs(subs.map((s) => (list.includes(s.id) ? { ...s, score: upd.score, feedback: upd.feedback } : s)))
         if (goNext) idx + 1 < queue.length ? setIdx(idx + 1) : setIdx(null)
       }} />
   }
@@ -165,7 +202,7 @@ function ByTask({ task, onBack }) {
     const { data } = await supabase.from('submission_photos').select('id,path').in('submission_id', ids)
     const n = (data || []).length
     if (!window.confirm(`${n} foto dari ${ids.length} siswa akan dihapus permanen. Nilai dan komentar tetap disimpan. Lanjutkan?`)) return
-    const paths = (data || []).map((p) => p.path)
+    const paths = [...new Set((data || []).map((p) => p.path))]
     for (let i = 0; i < paths.length; i += 100)
       await supabase.storage.from('jawaban').remove(paths.slice(i, i + 100))
     await supabase.from('submission_photos').delete().in('submission_id', ids)
@@ -200,7 +237,7 @@ function ByTask({ task, onBack }) {
     {!shown.length && <div className="empty">{f === 'wait' ? 'Tidak ada jawaban yang menunggu dinilai.' : 'Tidak ada data.'}</div>}
     {shown.map((s) => (
       <button className="taskcard" key={s.id} onClick={() => { setQueue(shown.map((x) => x.id)); setIdx(shown.indexOf(s)) }}>
-        <div><b>{s.profiles?.full_name}</b><div className="muted">{s.profiles?.classes?.name} · {when(s.submitted_at)}</div></div>
+        <div><b>{nameOf(s)}</b><div className="muted">{s.profiles?.classes?.name} · {when(s.submitted_at)}</div></div>
         <span className={'chip ' + (s.score != null ? 'graded' : 'sent')}>{s.score != null ? s.score : 'Nilai'}</span>
       </button>
     ))}

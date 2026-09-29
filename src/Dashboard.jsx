@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
+import Missing from './Missing.jsx'
 
 const greet = () => {
   const h = new Date().getHours()
@@ -46,6 +47,8 @@ export default function Dashboard({ profile }) {
       <div className="stat"><b>{d.tasks}</b><span>Tugas aktif</span></div>
       <div className={'stat' + (d.waiting ? ' hot' : '')}><b>{d.waiting}</b><span>Menunggu dinilai</span></div>
     </div>
+
+    <Missing />
 
     <div className="panel">
       <h3>Siswa per kelas</h3>

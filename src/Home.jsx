@@ -24,13 +24,13 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
     (async () => {
       const [a, s] = await Promise.all([
         supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active'),
-        supabase.from('submissions').select('assignment_id,status,score,updated_at'),
+        supabase.from('submissions').select('assignment_id,status,score,updated_at,return_note'),
       ])
       const sub = new Map((s.data || []).map((x) => [x.assignment_id, x]))
       setRows((a.data || []).map((t) => {
         const x = sub.get(t.id)
         const state = x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : 'todo'
-        return { ...t, state, score: x?.score, at: x?.updated_at }
+        return { ...t, state, score: x?.score, at: x?.updated_at, revise: state === 'todo' && !!x?.return_note }
       }))
     })()
   }, [])
@@ -77,7 +77,7 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
       ) : (
         <div className="list">
           {todo.slice(0, SHOW).map((t) => {
-            const di = dueInfo(t.due_at)
+            const di = t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due_at)
             return (
               <button className={'item ' + di.c} key={t.id} onClick={() => onOpen?.(t.id)}>
                 <span className="item-t">
