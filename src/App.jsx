@@ -161,7 +161,7 @@ export default function App() {
   const [state, setState] = useState('loading')
   const [s, setS] = useState(DEFAULTS)
 
-  useEffect(() => { loadSettings().then(setS) }, [])
+  useEffect(() => { loadSettings().then(setS).catch(() => {}) }, [])
   useEffect(() => {
     document.documentElement.style.setProperty('--board', s.color)
     document.title = s.school_name
@@ -171,7 +171,7 @@ export default function App() {
   useEffect(() => {
     let off = false
     withTimeout(supabase.auth.getSession())
-      .then(({ data }) => { if (!off) setSession(data.session) })
+      .then(({ data }) => { if (!off) setSession(data.session ?? null) })
       .catch(() => { if (!off) setState('error') })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, x) =>
       setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x)))
@@ -195,7 +195,11 @@ export default function App() {
     }
   }
 
-  useEffect(() => { if (session !== undefined) loadProfile(session) }, [session?.user?.id])
+  // PERBAIKAN: `session === undefined` ikut jadi dependency. Tanpa ini, saat belum login
+  // (session berubah dari undefined ke null) nilai `session?.user?.id` tetap undefined,
+  // efek tidak jalan lagi, dan layar macet di "Memuat...".
+  useEffect(() => { if (session !== undefined) loadProfile(session) },
+    [session === undefined, session?.user?.id])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
   if (state === 'error') return (
