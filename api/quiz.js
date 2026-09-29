@@ -315,6 +315,27 @@ export default async function handler(req, res) {
       return res.json({ quizzes: out })
     }
 
+    if (b.action === 'grades') { // daftar nilai quiz milik siswa yang sedang login
+      const { data: mine } = await admin.from('quiz_attempts').select('*').eq('student_id', me.id)
+      const ids = (mine || []).map((x) => x.quiz_id)
+      const qs = await inChunks(admin, 'quizzes', 'id,title,close_at,reveal,status,duration_min,question_seconds,open_at,subjects(name)', 'id', ids)
+      const out = []
+      for (const q of qs) {
+        if (q.status !== 'published') continue
+        let at = (mine || []).find((x) => x.quiz_id === q.id)
+        if (!at) continue
+        if (!at.finished_at && isExpired(q, at, now)) at = await finish(admin, at, at.answers || {})
+        if (!at?.finished_at) continue // masih dikerjakan
+        const hidden = resultView(q, at, now).hidden
+        out.push({
+          id: q.id, title: q.title, subject: q.subjects?.name || '', finished_at: at.finished_at, hidden,
+          ...(hidden ? {} : { score: Number(at.score), correct: at.correct_count, total: at.total }),
+        })
+      }
+      out.sort((x, y) => String(y.finished_at).localeCompare(String(x.finished_at)))
+      return res.json({ quizzes: out })
+    }
+
     if (b.action === 'start') {
       const quiz = await studentQuiz(b.id)
       if (!quiz) return bad(404, 'Quiz tidak ditemukan')
