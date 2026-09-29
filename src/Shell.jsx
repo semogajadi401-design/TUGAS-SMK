@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { Brand } from './Settings.jsx'
 import { Art } from './Backdrop.jsx'
+import './notifs.css'
 
 export const I = {
   menu: 'M4 7h16M4 12h16M4 17h10',
@@ -26,6 +27,8 @@ export const Icon = ({ d, size = 22 }) => (
     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 )
 
+const show = (n) => (n > 99 ? '99+' : n)
+
 export default function Shell({ s, profile, role, items, tab, setTab, children }) {
   const [open, setOpen] = useState(false)
   const [fx, setFx] = useState(() => { try { return localStorage.getItem('bgfx') === '1' } catch { return false } })
@@ -38,6 +41,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
   }, [])
 
   const cur = items.find((i) => i.k === tab)
+  const total = items.reduce((a, i) => a + (i.badge || 0), 0)
   const go = (k) => { setTab(k); setOpen(false) }
   const out = () => { if (window.confirm('Keluar dari akun ini?')) supabase.auth.signOut() }
 
@@ -47,6 +51,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
       <header className="top">
         <button className="menu-btn" aria-label="Buka menu" aria-expanded={open} onClick={() => setOpen(true)}>
           <Icon d={I.menu} />
+          {total > 0 && <span className="badge corner" aria-label={`${total} pemberitahuan baru`}>{show(total)}</span>}
         </button>
         <div className="ttl"><small>{s.school_name}</small><strong>{cur?.label}</strong></div>
         <button className={'menu-btn fx-btn' + (fx ? ' on' : '')} aria-pressed={fx} onClick={flipFx}
@@ -67,6 +72,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
           {items.map((i) => (
             <button key={i.k} className={'d-item' + (tab === i.k ? ' on' : '')} onClick={() => go(i.k)}>
               <Icon d={i.icon} />{i.label}
+              {i.badge > 0 && <span className="badge" aria-label={`${i.badge} baru`}>{show(i.badge)}</span>}
             </button>
           ))}
         </nav>
