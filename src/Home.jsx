@@ -116,6 +116,9 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
       <header className="hi">
         <small>{today}</small>
         <h2>{hello}, {first}</h2>
+        {(profile.kelas || profile.code) && (
+          <small className="who">{[profile.kelas && `Kelas ${profile.kelas}`, profile.code && `Username: ${profile.code}`].filter(Boolean).join(' · ')}</small>
+        )}
       </header>
       {showTip && (
         <div className="tip">
