@@ -67,3 +67,73 @@ fieldset:disabled input,fieldset:disabled textarea{background:#f4f7f5}
 /* Siswa: batang sisa waktu per soal */
 .qz-tbar{height:8px;background:#edf2ef;border-radius:99px;overflow:hidden;margin-bottom:12px}
 .qz-tbar div{height:100%;background:var(--board);border-radius:99px}
+
+/* ---- Animasi hitung mundur & nilai (setelah quiz selesai) ---- */
+.rv{--rv-a:#4cc9f0;position:fixed;inset:0;z-index:200;display:grid;place-items:center;overflow:hidden;color:#fff;
+  background:linear-gradient(160deg,#1b1147 0%,#3a1c8f 50%,#0e5f8a 100%);animation:rvin .35s ease-out}
+.rv.c-gold{--rv-a:#ffc93c}.rv.c-green{--rv-a:#35d49a}.rv.c-blue{--rv-a:#4cc9f0}.rv.c-orange{--rv-a:#ff9f45}.rv.c-rose{--rv-a:#ff6b8b}
+.rv-bg i{position:absolute;border-radius:50%;filter:blur(50px);opacity:.55;animation:rvfloat 9s ease-in-out infinite}
+.rv-bg i:nth-child(1){width:60vmax;height:60vmax;left:-20vmax;top:-20vmax;background:#7b4dff}
+.rv-bg i:nth-child(2){width:50vmax;height:50vmax;right:-18vmax;bottom:-16vmax;background:#00b4d8;animation-delay:-3s}
+.rv-bg i:nth-child(3){width:34vmax;height:34vmax;left:30%;top:40%;background:var(--rv-a);opacity:.28;animation-delay:-6s}
+.rv-p{position:absolute;bottom:-20px;left:var(--x);width:var(--s);height:var(--s);border-radius:50%;background:rgba(255,255,255,.75);
+  box-shadow:0 0 10px rgba(255,255,255,.8);opacity:0;animation:rvrise var(--d) linear var(--dl) infinite}
+.rv-cf{position:absolute;top:-24px;left:var(--x);width:9px;height:16px;border-radius:2px;background:var(--h);z-index:3;
+  animation:rvfall var(--d) ease-in var(--dl) both}
+
+.rv-stage{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:34px;padding:20px}
+.rv-ring{position:relative;width:min(68vw,270px);aspect-ratio:1;display:grid;place-items:center}
+.rv-ring::after{content:"";position:absolute;inset:8%;border-radius:50%;border:2px solid rgba(255,255,255,.55);animation:rvpulse 1s ease-out infinite}
+.rv-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.rv-ring circle{fill:none}
+.rv-track{stroke:rgba(255,255,255,.16);stroke-width:8}
+.rv-prog{stroke:#fff;stroke-width:8;stroke-linecap:round;stroke-dasharray:616;stroke-dashoffset:0;
+  filter:drop-shadow(0 0 8px rgba(255,255,255,.9));animation:rvprog 10s linear forwards}
+.rv-dash{stroke:rgba(255,255,255,.4);stroke-width:2;stroke-dasharray:3 11;transform-box:fill-box;transform-origin:center;animation:rvspin 14s linear infinite}
+.rv-orbit{position:absolute;inset:-16px;animation:rvspin 3.2s linear infinite}
+.rv-orbit i{position:absolute;top:0;left:50%;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#ffc93c;box-shadow:0 0 16px #ffc93c}
+.rv-orbit.o2{inset:-34px;animation-duration:5.5s;animation-direction:reverse}
+.rv-orbit.o2 i{background:#4cc9f0;box-shadow:0 0 16px #4cc9f0;width:11px;height:11px}
+.rv-orbit.o3{inset:-52px;animation-duration:8s}
+.rv-orbit.o3 i{background:#ff6b8b;box-shadow:0 0 16px #ff6b8b;width:9px;height:9px}
+.rv-num{position:relative;font-size:min(30vw,8rem);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
+  text-shadow:0 0 34px rgba(255,255,255,.55);animation:rvpop .95s ease-out both}
+.rv-msg{margin:0;font-size:1.1rem;font-weight:600;letter-spacing:.01em;color:rgba(255,255,255,.92);animation:rvtext .6s ease-out both}
+
+.rv-final{position:relative;z-index:4;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:24px;max-width:460px}
+.rv-scorewrap{position:relative;margin-bottom:18px;transition:transform .9s cubic-bezier(.6,0,.4,1)}
+.rv-score{position:relative;width:min(70vw,300px);aspect-ratio:1;border-radius:50%;display:grid;place-content:center;
+  background:radial-gradient(circle,rgba(255,255,255,.2),rgba(255,255,255,.04) 70%);border:4px solid var(--rv-a);
+  box-shadow:0 0 70px var(--rv-a),inset 0 0 40px rgba(255,255,255,.12);animation:rvboom .9s cubic-bezier(.2,1.5,.4,1) both}
+.rv-score strong{font-size:min(24vw,6.6rem);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 0 30px var(--rv-a)}
+.rv-score small{font-size:.95rem;opacity:.85;margin-top:4px}
+.rv-wave{position:absolute;inset:0;border-radius:50%;border:3px solid var(--rv-a);pointer-events:none;animation:rvwave 1.5s ease-out both}
+.rv-wave.w2{animation-delay:.25s}
+.rv-final h2{margin:0;font-size:1.7rem;color:#fff;animation:rvtext .7s .5s ease-out both}
+.rv-final p{margin:0;color:rgba(255,255,255,.9);animation:rvtext .7s .7s ease-out both}
+.rv-final em{margin-top:14px;font-style:normal;font-size:.8rem;color:rgba(255,255,255,.6);animation:rvtext .7s 1.4s ease-out both}
+.rv-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* mengecil: nilai naik ke atas & mengecil, latar memudar, halaman hasil terlihat */
+.rv.out{animation:rvout .95s ease-in forwards;pointer-events:none}
+.rv.out .rv-scorewrap{transform:translateY(-34vh) scale(.2)}
+.rv.out h2,.rv.out p,.rv.out em{opacity:0;animation:none;transition:opacity .3s}
+.rv.out .rv-cf{opacity:0;transition:opacity .3s}
+
+@keyframes rvin{from{opacity:0}to{opacity:1}}
+@keyframes rvout{0%,35%{opacity:1}100%{opacity:0}}
+@keyframes rvspin{to{transform:rotate(360deg)}}
+@keyframes rvprog{to{stroke-dashoffset:616}}
+@keyframes rvpulse{0%{transform:scale(.9);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+@keyframes rvpop{0%{transform:scale(2.3);opacity:0}25%{transform:scale(.94);opacity:1}42%{transform:scale(1.07)}100%{transform:scale(1)}}
+@keyframes rvtext{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes rvboom{0%{transform:scale(.2);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes rvwave{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.3);opacity:0}}
+@keyframes rvfloat{0%,100%{transform:translate(0,0)}50%{transform:translate(6vmax,-5vmax)}}
+@keyframes rvrise{0%{transform:translateY(0);opacity:0}15%{opacity:.85}100%{transform:translateY(-110vh);opacity:0}}
+@keyframes rvfall{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(112vh) rotate(760deg)}}
+@media (prefers-reduced-motion:reduce){
+  .rv-p,.rv-cf,.rv-wave,.rv-orbit,.rv-ring::after,.rv-bg i{display:none}
+  .rv,.rv *{animation-duration:.01s!important;animation-delay:0s!important}
+  .rv-scorewrap{transition:none}
+}
