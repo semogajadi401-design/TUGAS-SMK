@@ -153,3 +153,35 @@ textarea:focus{border-color:var(--board);outline:none}
 .chip.graded{background:var(--board);color:#fff}
 .chip.draft{background:#fff0c2;color:#7a5a00}
 .chip.none{background:#fdecea;color:var(--danger)}
+
+/* ---- Menu samping (drawer) ---- */
+.top{position:relative;z-index:1}
+.ttl{flex:1;min-width:0}
+.ttl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-btn{width:44px;height:44px;border:0;border-radius:14px;background:rgba(255,255,255,.16);
+  color:#fff;display:grid;place-items:center;cursor:pointer;flex:none}
+.menu-btn:active{background:rgba(255,255,255,.28)}
+.scrim{position:fixed;inset:0;background:rgba(10,20,17,.5);opacity:0;pointer-events:none;
+  transition:opacity .25s;z-index:20}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(84%,330px);background:#fff;z-index:21;
+  display:flex;flex-direction:column;transform:translateX(-102%);visibility:hidden;
+  transition:transform .25s ease,visibility 0s .25s;border-radius:0 26px 26px 0;overflow:auto;
+  box-shadow:8px 0 30px rgba(0,0,0,.2)}
+.drawer.open{transform:none;visibility:visible;transition:transform .25s ease}
+.d-head{position:relative;display:flex;align-items:center;gap:14px;color:#fff;
+  padding:calc(var(--sat) + 26px) 20px 24px;
+  background:linear-gradient(165deg,var(--board),var(--board-dark))}
+.d-who{min-width:0}
+.d-who strong{display:block;line-height:1.25;overflow-wrap:anywhere}
+.d-who small{color:#cfe3dc}
+.d-close{position:absolute;top:calc(var(--sat) + 10px);right:10px;width:40px;height:40px;border:0;
+  background:none;color:#fff;display:grid;place-items:center;cursor:pointer;border-radius:12px}
+.d-nav{padding:14px 12px;display:flex;flex-direction:column;gap:4px}
+.d-item{display:flex;align-items:center;gap:14px;width:100%;border:0;background:none;
+  padding:14px;border-radius:14px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.d-item.on{background:color-mix(in srgb,var(--board) 12%,white);color:var(--board)}
+.d-out{margin:auto 16px calc(var(--sab) + 20px);display:flex;align-items:center;justify-content:center;
+  gap:10px;padding:14px;border-radius:14px;border:1.5px solid var(--danger);background:#fff;
+  color:var(--danger);font-weight:700;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}

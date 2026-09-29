@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { supabase, toEmail } from './supabase.js'
+import { supabase } from './supabase.js'
 import Students from './Students.jsx'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
 import Tasks from './Tasks.jsx'
-import Settings, { Brand, loadSettings, DEFAULTS } from './Settings.jsx'
+import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
+import Shell, { I } from './Shell.jsx'
 
 function ChangePassword({ onDone }) {
   const [pw, setPw] = useState('')
@@ -40,50 +41,42 @@ const Soon = ({ text }) => <div className="empty">{text}</div>
 
 function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
-  const tabs = [['home', 'Beranda'], ['tasks', 'Tugas'], ['grades', 'Nilai'], ['account', 'Akun']]
+  const items = [
+    { k: 'home', label: 'Beranda', icon: I.home },
+    { k: 'tasks', label: 'Tugas', icon: I.tasks },
+    { k: 'grades', label: 'Nilai', icon: I.star },
+    { k: 'account', label: 'Akun', icon: I.user },
+  ]
   return (
-    <div className="shell">
-      <div className="top"><Brand s={s} size={42} /><div><small>Halo, {s.school_name}</small><strong>{profile.full_name}</strong></div></div>
-      <div className="page">
-        {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} />}
-        {tab === 'tasks' && (<><h2>Tugas</h2><Soon text="Segera hadir (Langkah 3)." /></>)}
-        {tab === 'grades' && (<><h2>Nilai</h2><Soon text="Segera hadir (Langkah 3)." /></>)}
-        {tab === 'account' && (<>
-          <h2>Akun</h2>
-          <ChangePassword onDone={reload} />
-          <button className="btn ghost" style={{ marginTop: 16 }}
-            onClick={() => supabase.auth.signOut()}>Keluar</button>
-        </>)}
-      </div>
-      <nav className="tabs">
-        {tabs.map(([k, l]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
-        ))}
-      </nav>
-    </div>
+    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={setTab}>
+      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} />}
+      {tab === 'tasks' && <Soon text="Daftar dan pengerjaan tugas segera hadir." />}
+      {tab === 'grades' && <Soon text="Riwayat nilai segera hadir." />}
+      {tab === 'account' && (<>
+        <h2>Ubah password</h2>
+        <ChangePassword onDone={reload} />
+        <button className="btn ghost" style={{ marginTop: 16 }}
+          onClick={() => window.confirm('Keluar dari akun ini?') && supabase.auth.signOut()}>Keluar dari akun</button>
+      </>)}
+    </Shell>
   )
 }
 
 function Teacher({ profile, s, onSaved }) {
   const [tab, setTab] = useState('dash')
+  const items = [
+    { k: 'dash', label: 'Dasbor', icon: I.grid },
+    { k: 'tasks', label: 'Tugas', icon: I.tasks },
+    { k: 'students', label: 'Siswa & Kelas', icon: I.users },
+    { k: 'settings', label: 'Pengaturan', icon: I.sliders },
+  ]
   return (
-    <div className="shell">
-      <div className="top"><Brand s={s} size={42} /><div><small>{s.school_name}</small><strong>{profile.full_name}</strong></div></div>
-      <div className="page">
-        {tab === 'dash' && <Dashboard profile={profile} />}
-        {tab === 'tasks' && <Tasks profile={profile} />}
-        {tab === 'students' && <Students />}
-        {tab === 'settings' && (<>
-          <Settings s={s} onSaved={onSaved} />
-          <button className="btn ghost" style={{ marginTop: 12 }} onClick={() => supabase.auth.signOut()}>Keluar</button>
-        </>)}
-      </div>
-      <nav className="tabs">
-        {[['dash', 'Dasbor'], ['tasks', 'Tugas'], ['students', 'Siswa & Kelas'], ['settings', 'Pengaturan']].map(([k, l]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
-        ))}
-      </nav>
-    </div>
+    <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
+      {tab === 'dash' && <Dashboard profile={profile} />}
+      {tab === 'tasks' && <Tasks profile={profile} />}
+      {tab === 'students' && <Students />}
+      {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
+    </Shell>
   )
 }
 
@@ -102,13 +95,13 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, x) => setSession(x))
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  async function loadProfile(s = session) {
-    if (!s) { setProfile(null); setState('out'); return }
-    const { data } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
+  async function loadProfile(x = session) {
+    if (!x) { setProfile(null); setState('out'); return }
+    const { data } = await supabase.from('profiles').select('*').eq('id', x.user.id).maybeSingle()
     if (!data || !data.active) {
       await supabase.auth.signOut(); setProfile(null); setState('out'); return
     }
