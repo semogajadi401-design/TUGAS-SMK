@@ -46,20 +46,18 @@ function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
   const [openId, setOpenId] = useState(null)
   const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
-  const forced = !profile.password_changed
-  const items = forced ? [{ k: 'account', label: 'Akun', icon: I.user }] : [
+  const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
     { k: 'grades', label: 'Nilai', icon: I.star },
     { k: 'account', label: 'Akun', icon: I.user },
   ]
   return (
-    <Shell s={s} profile={profile} role="Siswa" items={items} tab={forced ? 'account' : tab} setTab={go}>
-      {forced && <div className="banner">Demi keamanan, buat password baru dulu sebelum memakai aplikasi.</div>}
-      {!forced && tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
-      {!forced && tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
-      {!forced && tab === 'grades' && <Grades />}
-      {(forced || tab === 'account') && (<>
+    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
+      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
+      {tab === 'grades' && <Grades />}
+      {tab === 'account' && (<>
         <h2>Ubah password</h2>
         <ChangePassword onDone={reload} code={profile.code} />
         <button className="btn ghost" style={{ marginTop: 16 }}
