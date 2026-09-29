@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { callApi, compress } from './util.js'
 import { useQuestionUrls, QuestionHead } from './Questions.jsx'
+import { Icon, I } from './Shell.jsx'
 
 const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 function dueInfo(due) {
@@ -281,7 +282,7 @@ export default function StudentTasks({ profile, openId, setOpenId }) {
     : <List onOpen={setOpenId} />
 }
 
-export function Grades() {
+function TaskGrades() {
   const [rows, setRows] = useState(null)
   useEffect(() => {
     supabase.from('submissions').select('score,feedback,updated_at,assignments(title,subjects(name))')
@@ -308,5 +309,65 @@ export function Grades() {
         <div><b>{r.assignments?.title}</b>{r.assignments?.subjects?.name && <div className="muted">{r.assignments.subjects.name}</div>}{r.feedback && <p>{r.feedback}</p>}</div>
       </div>
     ))}
+  </>)
+}
+
+function QuizGrades() {
+  const [rows, setRows] = useState(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    callApi('/api/quiz', { action: 'grades' }).then((r) => setRows(r.quizzes)).catch((e) => { setErr(e.message); setRows([]) })
+  }, [])
+  if (rows === null) return <div className="empty">Memuat...</div>
+  const shown = rows.filter((r) => !r.hidden)
+  const avg = shown.length ? Math.round(shown.reduce((n, r) => n + r.score, 0) / shown.length) : null
+  const per = {}
+  shown.forEach((r) => { const n = r.subject || 'Tanpa mapel'; (per[n] = per[n] || []).push(r.score) })
+  const num = (v) => Number(v).toLocaleString('id-ID', { maximumFractionDigits: 2 })
+  return (<>
+    {err && <div className="err">{err}</div>}
+    {avg !== null && <div className="hero hero-quiz"><div><small>Rata-rata nilai quiz</small><h2>{avg}</h2><p>dari {shown.length} quiz</p></div></div>}
+    {Object.keys(per).length > 1 && (
+      <div className="stats">
+        {Object.entries(per).map(([n, v]) => (
+          <div className="stat" key={n}><b>{Math.round(v.reduce((a, b) => a + b, 0) / v.length)}</b><span>{n}</span></div>
+        ))}
+      </div>
+    )}
+    {!rows.length && !err && <div className="empty">Belum ada quiz yang selesai dikerjakan.</div>}
+    {rows.map((r) => (
+      <div className="result" key={r.id}>
+        <div className="big">{r.hidden ? '?' : num(r.score)}</div>
+        <div>
+          <b>{r.title}</b>
+          {r.subject && <div className="muted">{r.subject}</div>}
+          <p className="muted" style={{ marginTop: 4 }}>{r.hidden ? 'Nilai tampil setelah quiz ditutup oleh guru.' : `${r.correct} benar dari ${r.total} soal`}</p>
+        </div>
+      </div>
+    ))}
+  </>)
+}
+
+export function Grades() {
+  const [view, setView] = useState(null) // null = pilih kartu | 'tasks' | 'quiz'
+  if (view) return (<>
+    <button className="link" style={{ marginTop: 0 }} onClick={() => setView(null)}>Kembali</button>
+    <h2>{view === 'tasks' ? 'Nilai Tugas' : 'Nilai Quiz'}</h2>
+    {view === 'tasks' ? <TaskGrades /> : <QuizGrades />}
+  </>)
+  return (<>
+    <h2>Nilai</h2>
+    <div className="gcards">
+      <button className="gcard g-task" onClick={() => setView('tasks')}>
+        <span className="gicon"><Icon d={I.tasks} size={28} /></span>
+        <span className="gtxt"><b>Nilai Tugas</b><small>Nilai dan komentar dari guru untuk tugasmu</small></span>
+        <span className="garrow" aria-hidden="true">›</span>
+      </button>
+      <button className="gcard g-quiz" onClick={() => setView('quiz')}>
+        <span className="gicon"><Icon d={I.quiz} size={28} /></span>
+        <span className="gtxt"><b>Nilai Quiz</b><small>Skor dari quiz yang sudah kamu kerjakan</small></span>
+        <span className="garrow" aria-hidden="true">›</span>
+      </button>
+    </div>
   </>)
 }
