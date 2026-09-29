@@ -1,0 +1,65 @@
+/* Quiz: memakai token warna aplikasi (--board, --chalk, --line, --muted, --danger). */
+.qz-meta{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.qz-nav{display:flex;gap:10px}
+.qz-nav .btn{flex:1;width:auto}
+select,textarea{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;margin-bottom:16px}
+select:focus,textarea:focus{border-color:var(--board);outline:none}
+textarea{resize:vertical}
+fieldset.panel{min-width:0;margin-inline:0}
+fieldset:disabled input,fieldset:disabled textarea{background:#f4f7f5}
+
+/* Siswa: mengerjakan */
+.qz-bar{position:sticky;top:-20px;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  background:var(--paper);padding:12px 0;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.qz-bar small{display:block;color:var(--muted)}
+.qz-timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.3rem;color:var(--board)}
+.qz-timer.low{color:var(--danger)}
+.qz-opts{display:grid;gap:10px;margin-top:14px}
+.qz-opt{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;padding:12px 14px;background:#fff;
+  border:1.5px solid var(--line);border-radius:12px;cursor:pointer;color:var(--ink)}
+.qz-opt b{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#edf2ef}
+.qz-opt.on{border-color:var(--board);background:color-mix(in srgb,var(--board) 8%,#fff)}
+.qz-opt.on b{background:var(--board);color:#fff}
+.qz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:8px;margin:16px 0}
+.qz-grid button{padding:10px 0;border:1.5px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;font-weight:600}
+.qz-grid button.has{background:color-mix(in srgb,var(--board) 14%,#fff);border-color:var(--board)}
+.qz-grid button.cur{outline:3px solid var(--chalk);outline-offset:1px}
+
+/* Siswa: hasil */
+.qz-score{display:flex;flex-direction:column;align-items:center;padding:24px 0}
+.qz-score strong{font-size:3.4rem;line-height:1;color:var(--board)}
+.qz-score span{color:var(--muted);margin-top:6px}
+.qz-dots{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-bottom:20px}
+.qz-dots span{display:flex;flex-direction:column;align-items:center;padding:8px 0;border-radius:10px;font-weight:700}
+.qz-dots small{font-weight:500;font-size:.72rem}
+.qz-dots .yes{background:#dcefe8;color:var(--board)}
+.qz-dots .no{background:#fdecea;color:var(--danger)}
+
+/* Guru: editor */
+.qz-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media (max-width:480px){.qz-2col{grid-template-columns:1fr}}
+.qz-classes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.qz-check{display:inline-flex;align-items:center;gap:8px;margin:0;padding:8px 12px;border:1.5px solid var(--line);border-radius:99px;cursor:pointer;font-weight:500}
+.qz-check.on{border-color:var(--board);background:color-mix(in srgb,var(--board) 8%,#fff)}
+.qz-check input{width:auto;margin:0}
+.qz-check.inline{border:0;padding:0;border-radius:0}
+.qz-qhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.qz-q .link{margin-top:0}
+.qz-optlist{display:grid;gap:8px;margin-bottom:8px}
+.qz-optrow{display:flex;align-items:center;gap:8px}
+.qz-optrow input:not([type=radio]){margin:0;flex:1}
+.qz-optrow input[type=radio]{width:20px;height:20px;margin:0;accent-color:var(--board)}
+.qz-imgrow{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:12px}
+.qz-file{width:auto;padding:9px 14px;cursor:pointer}
+.qz-pts{display:flex;align-items:center;gap:6px;margin:0 0 0 auto;font-weight:500}
+.qz-pts input{width:72px;margin:0;padding:8px}
+
+/* Guru: hasil */
+.qz-right{display:flex;align-items:center;gap:12px}
+.qz-stat{padding:8px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.qz-stat:last-child{border-bottom:0}
+.qz-barwrap{position:relative;height:22px;margin-top:6px;background:#edf2ef;border-radius:6px;overflow:hidden}
+.qz-fill{height:100%;background:var(--board)}
+.qz-fill.low{background:var(--danger)}
+.qz-barwrap span{position:absolute;left:8px;top:0;line-height:22px;font-size:.78rem;font-weight:700;color:#fff;mix-blend-mode:normal;text-shadow:0 0 3px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion:no-preference){.qz-fill{transition:width .4s}}
