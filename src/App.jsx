@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase, toEmail } from './supabase.js'
 import Students from './Students.jsx'
+import Settings, { Brand, loadSettings, DEFAULTS } from './Settings.jsx'
 
-function Login() {
+function Login({ s }) {
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
@@ -21,7 +22,7 @@ function Login() {
 
   return (
     <div className="login">
-      <h1>Tugas<br />Sekolah</h1>
+      <div className="brand"><Brand s={s} size={76} /><h1>{s.school_name}</h1></div>
       <p>Masuk untuk melihat tugas dan nilaimu.</p>
       <form className="card" onSubmit={submit}>
         <label htmlFor="id">Kode</label>
@@ -68,12 +69,12 @@ function ChangePassword({ onDone }) {
 
 const Soon = ({ text }) => <div className="empty">{text}</div>
 
-function Student({ profile, reload }) {
+function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
   const tabs = [['home', 'Beranda'], ['tasks', 'Tugas'], ['grades', 'Nilai'], ['account', 'Akun']]
   return (
     <div className="shell">
-      <div className="top"><small>Halo,</small><strong>{profile.full_name}</strong></div>
+      <div className="top"><Brand s={s} size={42} /><div><small>Halo, {s.school_name}</small><strong>{profile.full_name}</strong></div></div>
       <div className="page">
         {tab === 'home' && (<>
           {!profile.password_changed && (
@@ -99,19 +100,20 @@ function Student({ profile, reload }) {
   )
 }
 
-function Teacher({ profile }) {
+function Teacher({ profile, s, onSaved }) {
   const [tab, setTab] = useState('dash')
   return (
     <div className="shell">
-      <div className="top"><small>Guru</small><strong>{profile.full_name}</strong></div>
+      <div className="top"><Brand s={s} size={42} /><div><small>{s.school_name}</small><strong>{profile.full_name}</strong></div></div>
       <div className="page">
         {tab === 'dash' && (<><h2>Dasbor</h2>
           <Soon text="Ringkasan tugas muncul di sini (Langkah 4)." />
           <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Keluar</button></>)}
         {tab === 'students' && <Students />}
+        {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
       </div>
       <nav className="tabs">
-        {[['dash', 'Dasbor'], ['students', 'Siswa & Kelas']].map(([k, l]) => (
+        {[['dash', 'Dasbor'], ['students', 'Siswa & Kelas'], ['settings', 'Pengaturan']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
         ))}
       </nav>
@@ -123,6 +125,14 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [state, setState] = useState('loading')
+  const [s, setS] = useState(DEFAULTS)
+
+  useEffect(() => { loadSettings().then(setS) }, [])
+  useEffect(() => {
+    document.documentElement.style.setProperty('--board', s.color)
+    document.title = s.school_name
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', s.color)
+  }, [s])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -142,8 +152,8 @@ export default function App() {
   useEffect(() => { if (session !== undefined) loadProfile(session) }, [session])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
-  if (state === 'out') return <Login />
+  if (state === 'out') return <Login s={s} />
   return profile.role === 'teacher'
-    ? <Teacher profile={profile} />
-    : <Student profile={profile} reload={() => loadProfile()} />
+    ? <Teacher profile={profile} s={s} onSaved={setS} />
+    : <Student profile={profile} s={s} reload={() => loadProfile()} />
 }
