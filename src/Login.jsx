@@ -13,13 +13,15 @@ const Icon = ({ d }) => (
     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 )
 
+// Segmen: [teks, warna] dengan 0 = putih, 1 = emas, 2 = hijau mint
 const MSG = [
-  'Setiap tugas kecil yang selesai adalah langkah menuju karya besar.',
-  'Disiplin hari ini, kebanggaan di hari esok.',
-  'Belajar bukan soal cepat, tetapi soal konsisten.',
-  'Ilmu tumbuh dari kebiasaan yang dijaga setiap hari.',
-  'Kerjakan dengan jujur. Hasilnya akan berbicara sendiri.',
+  [['Disiplin ', 2], ['melahirkan ', 0], ['prestasi.', 1]],
+  [['Belajar ', 0], ['cerdas', 2], [', hasil ', 0], ['nyata.', 1]],
+  [['Jujur ', 1], ['itu karya ', 0], ['terbaik.', 2]],
+  [['Masa depan ', 2], ['dimulai ', 0], ['hari ini.', 1]],
+  [['Tepat waktu', 1], [', ', 0], ['tuntas', 2], [', bermutu.', 0]],
 ]
+const TONE = ['', ' gold', ' mint']
 
 function Art() {
   const lines = Array.from({ length: 12 }, (_, i) => {
@@ -95,7 +97,15 @@ export default function Login({ s }) {
       <div className="login-in">
         <div className="lg-left">
           <div className="lg-brand"><Brand s={s} size={44} /><strong>{s.school_name}</strong></div>
-          <blockquote className="lg-msg" key={m} aria-live="polite">{MSG[m]}</blockquote>
+          <div className="lg-msg" role="status">
+            {MSG.map((line, i) => (
+              <p key={i} className={'lg-line' + (i === m ? ' on' : '')} aria-hidden={i !== m}>
+                {line.map(([t, c], j) => (
+                  <span key={j} className={TONE[c].trim()} style={{ transitionDelay: i === m ? j * 110 + 'ms' : '0ms' }}>{t}</span>
+                ))}
+              </p>
+            ))}
+          </div>
           <div className="lg-dots" role="tablist" aria-label="Pesan">
             {MSG.map((_, i) => <button key={i} type="button" className={i === m ? 'on' : ''} aria-label={'Pesan ' + (i + 1)} onClick={() => setM(i)} />)}
           </div>
