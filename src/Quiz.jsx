@@ -60,7 +60,9 @@ function Editor({ id, onBack }) {
   async function save(status) {
     setBusy(true); setErr('')
     try {
-      const body = { ...f, id, status, subject_id: f.subject_id || null }
+      // datetime-local tidak membawa zona waktu; ubah ke ISO (UTC) di browser agar server tidak salah menafsirkan.
+      const iso = (v) => (v ? new Date(v).toISOString() : null)
+      const body = { ...f, id, status, subject_id: f.subject_id || null, open_at: iso(f.open_at), close_at: iso(f.close_at) }
       if (!locked) body.questions = qs.map((q) => ({ text: q.text, image_path: q.image_path, options: q.options, correct: q.correct, points: q.points }))
       await api({ action: 'save', ...body })
       onBack(true)
