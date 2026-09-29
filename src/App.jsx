@@ -54,7 +54,7 @@ function Student({ profile, reload, s }) {
   ]
   return (
     <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
-      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
       {tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
