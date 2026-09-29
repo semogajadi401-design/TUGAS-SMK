@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import Subjects from './Subjects.jsx'
 
 const TYPES = { photo: 'Foto', text: 'Teks', both: 'Foto dan teks' }
 const fmt = (d) => d
@@ -18,7 +17,6 @@ function stateOf(sub, due) {
 function NewTask({ profile, onDone, onCancel }) {
   const [classes, setClasses] = useState([])
   const [subjects, setSubjects] = useState([])
-  const [newSub, setNewSub] = useState('')
   const [f, setF] = useState({ title: '', instructions: '', due: '', type: 'photo', subject: '' })
   const [picked, setPicked] = useState([])
   const [file, setFile] = useState(null)
@@ -30,16 +28,6 @@ function NewTask({ profile, onDone, onCancel }) {
     supabase.from('subjects').select('id,name').order('name').then((r) => setSubjects(r.data || []))
   }, [])
 
-  async function addSubject() {
-    const name = newSub.replace(/\s+/g, ' ').trim()
-    if (!name) return
-    const ex = subjects.find((s) => s.name.toLowerCase() === name.toLowerCase())
-    if (ex) { setF({ ...f, subject: ex.id }); setNewSub(''); return }
-    const { data, error } = await supabase.from('subjects').insert({ name }).select('id,name').single()
-    if (error) return setErr('Gagal menambah mapel: ' + error.message)
-    setSubjects([...subjects, data].sort((a, b) => a.name.localeCompare(b.name)))
-    setF({ ...f, subject: data.id }); setNewSub(''); setErr('')
-  }
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const toggle = (id) => setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
 
@@ -81,10 +69,8 @@ function NewTask({ profile, onDone, onCancel }) {
       {subjects.map((s) => (
         <button key={s.id} type="button" className={f.subject === s.id ? 'on' : ''} onClick={() => setF({ ...f, subject: s.id })}>{s.name}</button>
       ))}
-      {!subjects.length && <span className="muted">Belum ada mapel. Tambahkan di bawah.</span>}
+      {!subjects.length && <span className="muted">Belum ada mapel. Buat dulu di menu Pengaturan.</span>}
     </div>
-    <input value={newSub} placeholder="Mapel baru, lalu tekan Tambah" onChange={(e) => setNewSub(e.target.value)} />
-    <button type="button" className="btn ghost" onClick={addSubject}>Tambah mapel</button>
     <label htmlFor="i">Petunjuk (opsional)</label>
     <textarea id="i" rows="4" value={f.instructions} onChange={set('instructions')} />
     <label htmlFor="d">Tenggat (opsional)</label>
@@ -148,7 +134,6 @@ export default function Tasks({ profile }) {
   const [view, setView] = useState('list')
   const [data, setData] = useState(null)
   const [subj, setSubj] = useState('')
-  const [manage, setManage] = useState(false)
 
   async function load() {
     const [a, s, st] = await Promise.all([
@@ -169,8 +154,6 @@ export default function Tasks({ profile }) {
   return (<>
     <h2>Tugas</h2>
     <button className="btn" onClick={() => setView('new')}>Buat tugas baru</button>
-    <button className="link" onClick={() => setManage(!manage)}>{manage ? 'Tutup kelola mapel' : 'Kelola mapel'}</button>
-    {manage && <Subjects onChanged={load} />}
     <div style={{ height: 14 }} />
     {data && (() => {
       const opts = [...new Map(data.tasks.filter((t) => t.subjects).map((t) => [t.subject_id, t.subjects.name]))]

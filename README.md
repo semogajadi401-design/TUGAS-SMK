@@ -13,6 +13,7 @@ Stack: React + Vite, Supabase (Auth, Postgres, Storage), Vercel (hosting + fungs
 
 ## Endpoint server
 - `POST /api/import` : impor siswa (khusus guru).
+- `POST /api/reset` : reset data terpilih (nilai, foto, jawaban, tugas, siswa, kelas, mapel) dari Pengaturan.
 - `POST /api/student` : reset password, aktif/nonaktif, ubah nama/kelas (khusus guru).
 
 ## Database Supabase (yang dipakai kode)
