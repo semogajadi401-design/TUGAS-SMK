@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { callApi } from './util.js'
 import { QuestionHead } from './Questions.jsx'
+import QuizReveal from './QuizReveal.jsx'
 import './quiz.css'
 
 const api = (body) => callApi('/api/quiz', body)
@@ -166,8 +167,11 @@ export default function StudentQuiz() {
   }
   const back = () => { setView(null); setList(null); load() }
 
-  if (view?.take) return <Take data={view.take} onDone={(r) => setView({ result: r })} />
-  if (view?.result) return <Result r={view.result} onBack={back} />
+  if (view?.take) return <Take data={view.take} onDone={(r) => setView({ result: r, fresh: true })} />
+  if (view?.result) return (<>
+    <Result r={view.result} onBack={back} />
+    {view.fresh && !view.result.hidden && <QuizReveal score={view.result.score} onEnd={() => setView((v) => ({ ...v, fresh: false }))} />}
+  </>)
 
   const label = (q) => {
     if (q.attempt === 'done') return q.result_ready ? 'Lihat hasil' : 'Sudah dikirim'
