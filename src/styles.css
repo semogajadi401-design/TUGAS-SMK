@@ -452,3 +452,13 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .shell.fx-on :is(.panel,.row,.taskcard,.stat,.list,.result,.instr,.tbl-wrap,.preview,.tip,.empty-card,.task,.banner){
   background-color:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .shell.fx-on .stat.hot{background-color:var(--chalk)}
+
+/* ---- Kredit di bawah form login ---- */
+.lg-right{display:flex;flex-direction:column;gap:18px;margin-top:auto}
+.lg-right .card,.login .lg-right .card{margin:0;width:100%}
+.credit{text-align:center;color:rgba(255,255,255,.7);font-size:.85rem;line-height:1.5}
+.credit p{margin:0}
+.credit b{color:#fff;font-weight:700}
+.credit p:first-child b{color:var(--chalk)}
+.credit .pw{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px}
+@media (min-width:900px){.lg-right{width:400px;flex:none;margin:0}}
