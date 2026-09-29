@@ -13,6 +13,7 @@ import Calendar from './Calendar.jsx'
 import Recap from './Recap.jsx'
 import Materials from './Materials.jsx'
 import StudentMaterials from './StudentMaterials.jsx'
+import { useNotifs, NotifPopup } from './Notifs.jsx'
 
 function ChangePassword({ onDone, code }) {
   const [pw, setPw] = useState('')
@@ -50,16 +51,19 @@ function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
   const [openId, setOpenId] = useState(null)
   const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
+  const nt = useNotifs()
+  useEffect(() => { if (['tasks', 'materials', 'grades'].includes(tab)) nt.markSeen(tab) }, [tab])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
-    { k: 'tasks', label: 'Tugas', icon: I.tasks },
-    { k: 'materials', label: 'Materi', icon: I.book },
+    { k: 'tasks', label: 'Tugas', icon: I.tasks, badge: nt.counts.tasks },
+    { k: 'materials', label: 'Materi', icon: I.book, badge: nt.counts.materials },
     { k: 'calendar', label: 'Kalender', icon: I.calendar },
-    { k: 'grades', label: 'Nilai', icon: I.star },
+    { k: 'grades', label: 'Nilai', icon: I.star, badge: nt.counts.grades },
     { k: 'account', label: 'Akun', icon: I.user },
   ]
   return (
     <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
+      {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
       {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
       {tab === 'materials' && <StudentMaterials />}
