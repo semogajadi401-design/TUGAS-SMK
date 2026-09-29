@@ -26,6 +26,16 @@ const MSG = [
 ]
 const TONE = ['', ' gold', ' mint']
 
+// Lambang percikan bergaya Claude, digambar sebagai SVG sederhana.
+const Spark = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="#D97757" strokeWidth="2.6" strokeLinecap="round">
+    {Array.from({ length: 12 }, (_, k) => {
+      const a = (k * Math.PI) / 6, r = k % 2 ? 6.2 : 10
+      return <line key={k} x1={12 + 2.6 * Math.cos(a)} y1={12 + 2.6 * Math.sin(a)} x2={12 + r * Math.cos(a)} y2={12 + r * Math.sin(a)} />
+    })}
+  </svg>
+)
+
 export default function Login({ s }) {
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
@@ -87,6 +97,7 @@ export default function Login({ s }) {
           </div>
           <p className="lg-sub">Tugas, materi, dan nilaimu di satu tempat.</p>
         </div>
+      <div className="lg-right">
       <form className="card glass" onSubmit={submit}>
         <h2>Masuk</h2>
         <div className="field">
@@ -109,6 +120,11 @@ export default function Login({ s }) {
         <button className="btn big" disabled={busy}>{busy ? 'Memeriksa...' : 'Masuk'}</button>
         <p className="hint">Pertama kali masuk? Password awalmu sama dengan kodemu.</p>
       </form>
+      <footer className="credit">
+        <p>Developed By <b>@Tasrif</b></p>
+        <p className="pw"><Spark /><span>Powered By <b>Anthropic</b></span></p>
+      </footer>
+      </div>
       </div>
     </div>
   )
