@@ -541,3 +541,22 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .qlabel{display:block;font-size:.85rem;font-weight:700;color:var(--muted);margin:6px 0 6px}
 .qcard textarea{margin-bottom:0}
 .qcard .photos{margin-bottom:8px}
+
+/* ---- Menu Nilai siswa: kartu pilihan ---- */
+.gcards{display:grid;gap:14px}
+.gcard{position:relative;display:flex;align-items:center;gap:16px;width:100%;text-align:left;border:0;cursor:pointer;
+  color:#fff;font:inherit;padding:22px 18px;border-radius:22px;overflow:hidden;min-height:112px;
+  box-shadow:0 10px 24px rgba(20,24,31,.16);transition:transform .15s,box-shadow .15s}
+.gcard:active{transform:scale(.98);box-shadow:0 5px 14px rgba(20,24,31,.16)}
+.gcard::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.14)}
+.g-task{background:linear-gradient(135deg,#0f9d78 0%,#1cc0a0 55%,#6fdcc0 100%)}
+.g-quiz{background:linear-gradient(135deg,#6a4ce0 0%,#9b5de5 55%,#f15bb5 100%)}
+.gicon{flex:none;width:54px;height:54px;border-radius:16px;background:rgba(255,255,255,.22);display:grid;place-items:center}
+.gtxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;position:relative;z-index:1}
+.gtxt b{font-size:1.15rem;letter-spacing:-.01em}
+.gtxt small{color:rgba(255,255,255,.88);font-size:.82rem;line-height:1.35}
+.garrow{flex:none;font-size:2rem;line-height:1;opacity:.85;position:relative;z-index:1}
+.hero.hero-quiz{background:linear-gradient(135deg,#6a4ce0,#9b5de5 60%,#f15bb5)}
+.hero.hero-quiz small,.hero.hero-quiz p{color:rgba(255,255,255,.9)}
+@media (min-width:700px){.gcards{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){.gcard{transition:none}}
