@@ -415,3 +415,40 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .lg-line .gold{color:var(--chalk)}
 .lg-line .mint{color:color-mix(in srgb,#5fe0c0 78%,white)}
 @media (prefers-reduced-motion:reduce){.lg-line span{transition:none;filter:none}}
+
+/* ---- Login: kaca (glass) + layar penuh ---- */
+.lg-fs{position:absolute;z-index:3;top:calc(var(--sat) + 14px);right:14px;width:44px;height:44px;display:grid;place-items:center;
+  border-radius:14px;border:1px solid rgba(255,255,255,.26);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.lg-fs:hover{background:rgba(255,255,255,.2)}
+.login .card.glass{background:linear-gradient(160deg,rgba(255,255,255,.17),rgba(255,255,255,.04)),rgba(6,20,15,.34);
+  backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.24);color:#fff;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.32)}
+.login .glass h2{color:#fff}
+.login .field input{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.18)}
+.login .field input:focus{background:rgba(255,255,255,.16);border-color:var(--chalk);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--chalk) 22%,transparent)}
+.login .field input:-webkit-autofill{-webkit-text-fill-color:#fff;caret-color:#fff;box-shadow:0 0 0 100px rgba(18,48,38,.92) inset}
+.login .field label{color:rgba(255,255,255,.74)}
+.login .field input:focus+label,.login .field input:not(:placeholder-shown)+label{color:var(--chalk)}
+.login .ico{color:var(--chalk)}
+.login .eye{color:rgba(255,255,255,.78)}
+.login .err{color:#ffc2b8;background:rgba(192,57,43,.28);padding:10px 12px;border-radius:10px;margin:0 0 14px}
+.login .hint{color:rgba(255,255,255,.72)}
+.login .btn{background:var(--chalk);color:#231a00}
+
+/* ---- Akun: latar transparan (mode terang, teks tetap jelas) ---- */
+.shell{position:relative}
+.page{position:relative;z-index:1}
+.bgfx{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;color:var(--board);
+  background:linear-gradient(160deg,#f8faf9,color-mix(in srgb,var(--board) 9%,#f3f5f7) 60%,color-mix(in srgb,var(--chalk) 10%,#f7f7f5))}
+.bgfx .b1{opacity:.22}.bgfx .b2{opacity:.2}.bgfx .b3{display:none}
+.bgfx .spark,.bgfx .spark.gold{box-shadow:none;background:color-mix(in srgb,var(--board) 55%,transparent)}
+.bgfx .spark.gold{background:var(--chalk)}
+.bgfx .streak{filter:none;stroke-width:2}
+.fx-btn.on{background:var(--board);color:#fff}
+.shell.fx-on .top{background:rgba(255,255,255,.72);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4)}
+.shell.fx-on :is(.panel,.row,.taskcard,.stat,.list,.result,.instr,.tbl-wrap,.preview,.tip,.empty-card,.task,.banner){
+  background-color:rgba(255,255,255,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.shell.fx-on .stat.hot{background-color:var(--chalk)}
