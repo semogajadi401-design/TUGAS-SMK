@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, toEmail } from './supabase.js'
+import Students from './Students.jsx'
 
 function Login() {
   const [id, setId] = useState('')
@@ -10,9 +11,10 @@ function Login() {
   async function submit(e) {
     e.preventDefault()
     setBusy(true); setErr('')
-    const { error } = await supabase.auth.signInWithPassword({
-      email: toEmail(id), password: pw,
-    })
+    const email = toEmail(id)
+    let { error } = await supabase.auth.signInWithPassword({ email, password: pw })
+    if (error && pw !== pw.toUpperCase())
+      ({ error } = await supabase.auth.signInWithPassword({ email, password: pw.toUpperCase() }))
     if (error) setErr('Kode atau password salah. Coba lagi, atau minta guru mereset passwordmu.')
     setBusy(false)
   }
@@ -98,14 +100,21 @@ function Student({ profile, reload }) {
 }
 
 function Teacher({ profile }) {
+  const [tab, setTab] = useState('dash')
   return (
     <div className="shell">
       <div className="top"><small>Guru</small><strong>{profile.full_name}</strong></div>
       <div className="page">
-        <h2>Dasbor</h2>
-        <Soon text="Login guru berhasil. Fitur guru dibuat di Langkah 4 dan 5." />
-        <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Keluar</button>
+        {tab === 'dash' && (<><h2>Dasbor</h2>
+          <Soon text="Ringkasan tugas muncul di sini (Langkah 4)." />
+          <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Keluar</button></>)}
+        {tab === 'students' && <Students />}
       </div>
+      <nav className="tabs">
+        {[['dash', 'Dasbor'], ['students', 'Siswa & Kelas']].map(([k, l]) => (
+          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </nav>
     </div>
   )
 }

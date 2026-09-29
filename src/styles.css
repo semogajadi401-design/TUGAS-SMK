@@ -45,3 +45,15 @@ input:focus{border-color:var(--board);outline:none}
 .tabs button.on{color:var(--board);border-top-color:var(--chalk)}
 .link{background:none;border:0;color:var(--muted);text-decoration:underline;
   cursor:pointer;margin-top:16px;padding:8px}
+
+select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px}
+.muted{color:var(--muted);font-size:.9rem}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.badge{background:#fff6dc;color:#7a5a00;font-size:.75rem;padding:4px 8px;border-radius:99px;white-space:nowrap}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.modal{background:#fff;width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;
+  padding:20px 20px calc(var(--sab) + 20px)}
+.modal h2{margin:0 0 8px}
+.prob{font-size:.85rem;padding:6px 10px;border-radius:6px;margin-bottom:4px}
+.prob.error{background:#fdecea;color:var(--danger)}
+.prob.skip{background:#fff6dc;color:#7a5a00}
