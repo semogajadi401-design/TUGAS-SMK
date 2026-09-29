@@ -5,6 +5,7 @@ import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
 import Tasks from './Tasks.jsx'
+import Grading from './Grading.jsx'
 import StudentTasks, { Grades } from './StudentTasks.jsx'
 import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
 import Shell, { I } from './Shell.jsx'
@@ -70,6 +71,7 @@ function Teacher({ profile, s, onSaved }) {
   const items = [
     { k: 'dash', label: 'Dasbor', icon: I.grid },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
+    { k: 'grading', label: 'Penilaian', icon: I.check },
     { k: 'students', label: 'Siswa & Kelas', icon: I.users },
     { k: 'settings', label: 'Pengaturan', icon: I.sliders },
   ]
@@ -77,6 +79,7 @@ function Teacher({ profile, s, onSaved }) {
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
       {tab === 'dash' && <Dashboard profile={profile} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
+      {tab === 'grading' && <Grading />}
       {tab === 'students' && <Students />}
       {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
     </Shell>
