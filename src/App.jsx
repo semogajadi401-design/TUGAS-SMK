@@ -96,12 +96,12 @@ function Student({ profile, reload, s }) {
       .then((r) => setKelas(r.data?.name || ''))
   }, [profile.class_id])
   const me = { ...profile, kelas }
-  useEffect(() => { if (['tasks', 'materials', 'grades'].includes(tab)) nt.markSeen(tab) }, [tab])
+  useEffect(() => { if (['tasks', 'materials', 'grades', 'quiz'].includes(tab)) nt.markSeen(tab) }, [tab])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks, badge: nt.counts.tasks },
     { k: 'materials', label: 'Materi', icon: I.book, badge: nt.counts.materials },
-    { k: 'quiz', label: 'Quiz', icon: I.quiz },
+    { k: 'quiz', label: 'Quiz', icon: I.quiz, badge: nt.counts.quiz },
     { k: 'calendar', label: 'Kalender', icon: I.calendar },
     { k: 'grades', label: 'Nilai', icon: I.star, badge: nt.counts.grades },
     { k: 'account', label: 'Akun', icon: I.user },
