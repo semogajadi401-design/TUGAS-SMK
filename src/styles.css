@@ -462,3 +462,18 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .credit p:first-child b{color:var(--chalk)}
 .credit .pw{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px}
 @media (min-width:900px){.lg-right{width:400px;flex:none;margin:0}}
+
+/* ---- Form login: biru lembut + tombol putih ---- */
+.login .card.glass{--lg-blue:#8ab8ff;
+  background:linear-gradient(160deg,rgba(150,190,255,.20),rgba(255,255,255,.04)),rgba(10,26,64,.38);
+  border-color:rgba(170,205,255,.30);
+  box-shadow:0 30px 80px -20px rgba(4,12,40,.65),inset 0 1px 0 rgba(255,255,255,.34)}
+.login .field input{border-color:rgba(170,205,255,.22)}
+.login .field input:focus{border-color:var(--lg-blue);background:rgba(150,190,255,.14);
+  box-shadow:0 0 0 4px rgba(138,184,255,.22)}
+.login .field input:focus+label,.login .field input:not(:placeholder-shown)+label{color:var(--lg-blue)}
+.login .field input:-webkit-autofill{box-shadow:0 0 0 100px rgba(16,36,84,.94) inset}
+.login .ico{color:var(--lg-blue)}
+.login .btn{background:#fff;color:#1d3a8a;box-shadow:0 8px 24px -8px rgba(0,0,0,.4)}
+.login .btn:hover:not(:disabled){filter:none;background:#eef4ff}
+.credit p:first-child b{color:#9cc4ff}
