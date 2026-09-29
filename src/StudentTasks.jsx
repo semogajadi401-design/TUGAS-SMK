@@ -107,7 +107,8 @@ function Detail({ id, profile, onBack }) {
 
   const graded = sub?.score != null
   const viewer = !!task.is_group && !grp?.isLeader
-  const locked = viewer || graded || (sub?.status === 'submitted' && task.due_at && new Date() > new Date(task.due_at))
+  const sent = sub?.status === 'submitted'
+  const locked = viewer || graded || sent // setelah dikirim ke guru, jawaban tidak bisa diubah lagi
   const wantsPhoto = task.answer_type !== 'text' && !viewer
   const wantsText = task.answer_type !== 'photo'
   const questions = task.questions || []
@@ -167,10 +168,10 @@ function Detail({ id, profile, onBack }) {
       }
       setAdded([]); setRemoved([])
       await load()
-      setMsg({ ok: true, t: submit ? 'Tugas terkirim. Kamu masih bisa mengubahnya sampai tenggat.' : 'Draf tersimpan.' })
+      setMsg({ ok: true, t: submit ? 'Tugas terkirim ke guru dan tidak bisa diubah lagi.' : 'Jawabanmu tersimpan. Kamu masih bisa mengubahnya sebelum dikirim.' })
     } catch (e) {
       setMsg({ ok: false, t: /row-level security/.test(e.message)
-        ? 'Tugas ini sudah terkunci (tenggat lewat atau sudah dinilai), jadi tidak bisa diubah.' : e.message })
+        ? 'Tugas ini sudah terkunci (sudah dikirim atau sudah dinilai), jadi tidak bisa diubah.' : e.message })
     }
     setBusy(false)
   }
@@ -232,7 +233,7 @@ function Detail({ id, profile, onBack }) {
         <div><b>Nilai kamu</b>{sub.feedback && <p>{sub.feedback}</p>}</div>
       </div>
     )}
-    {locked && !graded && <div className="banner">Tenggat sudah lewat, jawabanmu terkunci dan menunggu dinilai.</div>}
+    {locked && !graded && <div className="banner">{sent ? 'Tugas sudah dikirim ke guru, jadi tidak bisa diubah lagi. Menunggu dinilai.' : 'Tenggat sudah lewat, jawabanmu terkunci dan menunggu dinilai.'}</div>}
 
     {hasQ ? questions.map((q, i) => (
       <div className="qcard" key={q.id}>
@@ -265,12 +266,12 @@ function Detail({ id, profile, onBack }) {
     )}
 
     {msg && <div className={msg.ok ? 'ok' : 'err'} role="status">{msg.t}</div>}
-    {!locked && (sub?.status === 'submitted'
-      ? <button className="btn" disabled={busy} onClick={() => save(true)}>{busy ? 'Menyimpan...' : 'Simpan perubahan'}</button>
-      : <div className="picks">
-          <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan draf</button>
-          <button className="btn" disabled={busy} onClick={() => save(true)}>{busy ? 'Mengirim...' : 'Kirim tugas'}</button>
-        </div>)}
+    {!locked && (
+      <div className="picks">
+        <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan dulu</button>
+        <button className="btn" disabled={busy} onClick={() => save(true)}>{busy ? 'Mengirim...' : 'Kirim Sekarang'}</button>
+      </div>
+    )}
   </>)
 }
 
