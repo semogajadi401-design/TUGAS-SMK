@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase, toEmail } from './supabase.js'
 import { Brand } from './Settings.jsx'
 
@@ -13,12 +13,56 @@ const Icon = ({ d }) => (
     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 )
 
+const MSG = [
+  'Setiap tugas kecil yang selesai adalah langkah menuju karya besar.',
+  'Disiplin hari ini, kebanggaan di hari esok.',
+  'Belajar bukan soal cepat, tetapi soal konsisten.',
+  'Ilmu tumbuh dari kebiasaan yang dijaga setiap hari.',
+  'Kerjakan dengan jujur. Hasilnya akan berbicara sendiri.',
+]
+
+function Art() {
+  const lines = Array.from({ length: 12 }, (_, i) => {
+    const y = 170 + i * 50
+    return `M-120 ${y} C 260 ${y - 230}, 620 ${y + 250}, 980 ${y - 30} S 1400 ${y - 170}, 1600 ${y + 60}`
+  })
+  return (
+    <svg className="art" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lg-fade" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#fff" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <mask id="lg-mask"><rect width="1440" height="900" fill="url(#lg-fade)" /></mask>
+        <pattern id="lg-dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.4" fill="#fff" /></pattern>
+        <linearGradient id="lg-gold" x1="0" x2="1"><stop offset="0" stopColor="var(--chalk)" stopOpacity="0" /><stop offset=".5" stopColor="var(--chalk)" /><stop offset="1" stopColor="var(--chalk)" stopOpacity="0" /></linearGradient>
+      </defs>
+      <g mask="url(#lg-mask)" fill="none" stroke="#fff">
+        {lines.map((d, i) => <path key={i} d={d} strokeOpacity={0.05 + i * 0.013} strokeWidth="1" />)}
+      </g>
+      <path d={lines[6]} fill="none" stroke="url(#lg-gold)" strokeWidth="1.6" strokeOpacity=".75" />
+      <g fill="none" stroke="#fff" strokeOpacity=".09">
+        {[90, 160, 235, 320].map((r) => <circle key={r} cx="1190" cy="180" r={r} />)}
+      </g>
+      <circle cx="1190" cy="180" r="6" fill="var(--chalk)" />
+      <rect x="0" y="540" width="460" height="360" fill="url(#lg-dots)" opacity=".16" mask="url(#lg-mask)" />
+      <path d="M0 900 L300 600 L600 900 Z" fill="#fff" fillOpacity=".025" />
+      <path d="M180 900 L520 520 L860 900 Z" fill="var(--chalk)" fillOpacity=".04" />
+    </svg>
+  )
+}
+
 export default function Login({ s }) {
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [show, setShow] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [m, setM] = useState(0)
+
+  useEffect(() => {
+    const t = setInterval(() => setM((x) => (x + 1) % MSG.length), 6000)
+    return () => clearInterval(t)
+  }, [m])
 
   async function submit(e) {
     e.preventDefault()
@@ -33,11 +77,16 @@ export default function Login({ s }) {
 
   return (
     <div className="login">
-      <div className="orb o1" /><div className="orb o2" />
-      <div className="brand">
-        <Brand s={s} size={80} />
-        <div><h1>{s.school_name}</h1><p>Tugas, materi, dan nilaimu di satu tempat.</p></div>
-      </div>
+      <Art />
+      <div className="login-in">
+        <div className="lg-left">
+          <div className="lg-brand"><Brand s={s} size={44} /><strong>{s.school_name}</strong></div>
+          <blockquote className="lg-msg" key={m} aria-live="polite">{MSG[m]}</blockquote>
+          <div className="lg-dots" role="tablist" aria-label="Pesan">
+            {MSG.map((_, i) => <button key={i} type="button" className={i === m ? 'on' : ''} aria-label={'Pesan ' + (i + 1)} onClick={() => setM(i)} />)}
+          </div>
+          <p className="lg-sub">Tugas, materi, dan nilaimu di satu tempat.</p>
+        </div>
       <form className="card glass" onSubmit={submit}>
         <h2>Masuk</h2>
         <div className="field">
@@ -60,6 +109,7 @@ export default function Login({ s }) {
         <button className="btn big" disabled={busy}>{busy ? 'Memeriksa...' : 'Masuk'}</button>
         <p className="hint">Pertama kali masuk? Password awalmu sama dengan kodemu.</p>
       </form>
+      </div>
     </div>
   )
 }
