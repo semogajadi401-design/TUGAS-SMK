@@ -403,3 +403,15 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .tri.b{animation-duration:19s}
 @keyframes tri{to{transform:translateY(-26px)}}
 @media (prefers-reduced-motion:reduce){.blob,.spark,.sway,.streak,.ring,.orbit,.tri{animation:none}.spark{display:none}}
+
+/* ---- Pesan satu baris, kata berwarna, transisi halus ---- */
+.lg-left{container-type:inline-size;min-width:0}
+.lg-msg{display:grid;min-height:0;max-width:none;animation:none;font-size:clamp(1.15rem,5.2vw,2.6rem);font-size:clamp(1.15rem,6cqw,2.7rem);
+  font-weight:800;letter-spacing:-.03em;line-height:1.25}
+.lg-line{grid-area:1/1;margin:0;white-space:pre;pointer-events:none}
+.lg-line span{display:inline-block;opacity:0;transform:translateY(16px);filter:blur(8px);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1),filter .9s ease}
+.lg-line.on span{opacity:1;transform:none;filter:none}
+.lg-line .gold{color:var(--chalk)}
+.lg-line .mint{color:color-mix(in srgb,#5fe0c0 78%,white)}
+@media (prefers-reduced-motion:reduce){.lg-line span{transition:none;filter:none}}
