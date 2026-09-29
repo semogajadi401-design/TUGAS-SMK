@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import { Brand } from './Settings.jsx'
+import { Art } from './Backdrop.jsx'
 
 export const I = {
   menu: 'M4 7h16M4 12h16M4 17h10',
@@ -15,6 +16,7 @@ export const I = {
   check: 'M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   calendar: 'M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
   table: 'M3 5h18v14H3zM3 10h18M9 5v14',
 }
 
@@ -25,6 +27,8 @@ export const Icon = ({ d, size = 22 }) => (
 
 export default function Shell({ s, profile, role, items, tab, setTab, children }) {
   const [open, setOpen] = useState(false)
+  const [fx, setFx] = useState(() => { try { return localStorage.getItem('bgfx') === '1' } catch { return false } })
+  const flipFx = () => setFx((v) => { try { localStorage.setItem('bgfx', v ? '0' : '1') } catch { /* diabaikan */ } return !v })
 
   useEffect(() => {
     const k = (e) => e.key === 'Escape' && setOpen(false)
@@ -37,12 +41,15 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
   const out = () => { if (window.confirm('Keluar dari akun ini?')) supabase.auth.signOut() }
 
   return (
-    <div className="shell">
+    <div className={'shell' + (fx ? ' fx-on' : '')}>
+      {fx && <div className="bgfx" aria-hidden="true"><Art /></div>}
       <header className="top">
         <button className="menu-btn" aria-label="Buka menu" aria-expanded={open} onClick={() => setOpen(true)}>
           <Icon d={I.menu} />
         </button>
         <div className="ttl"><small>{s.school_name}</small><strong>{cur?.label}</strong></div>
+        <button className={'menu-btn fx-btn' + (fx ? ' on' : '')} aria-pressed={fx} onClick={flipFx}
+          aria-label="Latar transparan" title="Latar transparan"><Icon d={I.layers} /></button>
         <Brand s={s} size={38} />
       </header>
 
