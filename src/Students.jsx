@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from './supabase.js'
+import { loadXlsx } from './util.js'
 
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await loadXlsx()
   const wb = XLSX.utils.book_new()
   const data = XLSX.utils.aoa_to_sheet([['Nama', 'Kelas', 'Kode'], ['Contoh: Budi Santoso', '7A', '']])
   data['!cols'] = [{ wch: 32 }, { wch: 12 }, { wch: 14 }]
@@ -23,6 +24,7 @@ function downloadTemplate() {
 }
 
 async function parseFile(file) {
+  const XLSX = await loadXlsx()
   const wb = XLSX.read(await file.arrayBuffer())
   const rows = []
   for (const name of wb.SheetNames) {
@@ -101,7 +103,8 @@ function ImportModal({ onClose }) {
     setBusy(false)
   }
 
-  function downloadCodes() {
+  async function downloadCodes() {
+    const XLSX = await loadXlsx()
     const made = result.filter((r) => r.status === 'created')
     const ws = XLSX.utils.aoa_to_sheet([['Nama', 'Kelas', 'Kode'], ...made.map((r) => [r.nama, r.kelas, r.kode])])
     ws['!cols'] = [{ wch: 32 }, { wch: 12 }, { wch: 14 }]

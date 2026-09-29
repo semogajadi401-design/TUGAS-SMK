@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from './supabase.js'
-import { fetchAll } from './util.js'
+import { fetchAll, loadXlsx } from './util.js'
 
 const avgOf = (list) => {
   const v = list.filter((x) => x != null).map(Number)
@@ -45,7 +44,8 @@ export default function Recap() {
   const rowAvg = (s) => avgOf(tasks.map((t) => get(t, s)?.score))
   const colAvg = (t) => avgOf((d?.studs || []).map((s) => get(t, s)?.score))
 
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await loadXlsx()
     const name = classes.find((c) => c.id === cls)?.name || 'kelas'
     const rows = [['Nama', ...tasks.map((t) => t.title), 'Rata-rata'],
       ...d.studs.map((s) => [s.full_name, ...tasks.map((t) => get(t, s)?.score ?? ''), rowAvg(s) ?? '']),

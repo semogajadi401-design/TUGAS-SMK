@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import Students from './Students.jsx'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
-import Tasks from './Tasks.jsx'
-import Grading from './Grading.jsx'
-import StudentTasks, { Grades } from './StudentTasks.jsx'
-import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
 import Shell, { I } from './Shell.jsx'
-import Calendar from './Calendar.jsx'
-import Recap from './Recap.jsx'
-import Materials from './Materials.jsx'
-import StudentMaterials from './StudentMaterials.jsx'
 import { useNotifs, NotifPopup } from './Notifs.jsx'
+import { loadSettings, DEFAULTS } from './brand.jsx'
+
+// Tab dimuat hanya saat dibuka, jadi layar pertama jauh lebih ringan.
+const Students = lazy(() => import('./Students.jsx'))
+const Tasks = lazy(() => import('./Tasks.jsx'))
+const Grading = lazy(() => import('./Grading.jsx'))
+const StudentTasks = lazy(() => import('./StudentTasks.jsx'))
+const Grades = lazy(() => import('./StudentTasks.jsx').then((m) => ({ default: m.Grades })))
+const Settings = lazy(() => import('./Settings.jsx'))
+const Calendar = lazy(() => import('./Calendar.jsx'))
+const Recap = lazy(() => import('./Recap.jsx'))
+const Materials = lazy(() => import('./Materials.jsx'))
+const StudentMaterials = lazy(() => import('./StudentMaterials.jsx'))
+const Wait = <div className="empty">Memuat...</div>
 
 function ChangePassword({ onDone, code }) {
   const [pw, setPw] = useState('')
@@ -70,6 +75,7 @@ function Student({ profile, reload, s }) {
   ]
   return (
     <Shell s={s} profile={me} role="Siswa" items={items} tab={tab} setTab={go}>
+      <Suspense fallback={Wait}>
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
       {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
@@ -88,6 +94,7 @@ function Student({ profile, reload, s }) {
         <button className="btn ghost" style={{ marginTop: 16 }}
           onClick={() => window.confirm('Keluar dari akun ini?') && supabase.auth.signOut()}>Keluar dari akun</button>
       </>)}
+      </Suspense>
     </Shell>
   )
 }
@@ -105,6 +112,7 @@ function Teacher({ profile, s, onSaved }) {
   ]
   return (
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
+      <Suspense fallback={Wait}>
       {tab === 'dash' && <Dashboard profile={profile} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
@@ -112,6 +120,7 @@ function Teacher({ profile, s, onSaved }) {
       {tab === 'recap' && <Recap />}
       {tab === 'students' && <Students />}
       {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
+      </Suspense>
     </Shell>
   )
 }
@@ -131,7 +140,8 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, x) => setSession(x))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, x) =>
+      setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x)))
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -144,7 +154,7 @@ export default function App() {
     setProfile(data); setState('in')
   }
 
-  useEffect(() => { if (session !== undefined) loadProfile(session) }, [session])
+  useEffect(() => { if (session !== undefined) loadProfile(session) }, [session?.user?.id])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
   if (state === 'out') return <Login s={s} />

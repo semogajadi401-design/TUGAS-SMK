@@ -34,3 +34,7 @@ export function toLocalInput(iso) {
   const d = new Date(iso), p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
+
+// Library Excel (~400 KB) hanya diunduh saat benar-benar dipakai (ekspor/impor).
+let xlsxP
+export const loadXlsx = () => (xlsxP ||= import('xlsx'))

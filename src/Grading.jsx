@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from './supabase.js'
-import { callApi } from './util.js'
+import { callApi, fetchAll, loadXlsx } from './util.js'
 
 const QUICK = [50, 60, 70, 80, 90, 100]
 const TEMPLATES = ['Bagus sekali', 'Sudah baik', 'Perlu diperbaiki', 'Jawaban kurang lengkap', 'Foto kurang jelas, mohon kirim ulang', 'Kerjakan sesuai petunjuk']
@@ -17,12 +16,15 @@ function TaskList({ onOpen }) {
     (async () => {
       const [a, s] = await Promise.all([
         supabase.from('assignments').select('id,title,due_at,status,answer_type,subjects(name)').order('created_at', { ascending: false }),
-        supabase.from('submissions').select('assignment_id,status,score').eq('status', 'submitted'),
+        fetchAll(() => supabase.from('submissions').select('id,assignment_id,score').eq('status', 'submitted').order('id')),
       ])
-      const list = (a.data || []).map((t) => {
-        const mine = (s.data || []).filter((x) => x.assignment_id === t.id)
-        return { ...t, sent: mine.length, waiting: mine.filter((x) => x.score == null).length }
-      })
+      const cnt = new Map()
+      for (const x of s) {
+        const c = cnt.get(x.assignment_id) || { sent: 0, waiting: 0 }
+        c.sent++; if (x.score == null) c.waiting++
+        cnt.set(x.assignment_id, c)
+      }
+      const list = (a.data || []).map((t) => ({ ...t, ...(cnt.get(t.id) || { sent: 0, waiting: 0 }) }))
       list.sort((x, y) => (y.waiting > 0) - (x.waiting > 0))
       setRows(list)
     })()
@@ -106,7 +108,7 @@ function GradeOne({ task, sub, ids, label, pos, total, onSave, onReturned, onPre
       {sub.photos_cleaned && <p className="muted">Foto sudah dibersihkan.</p>}
       {!sub.photos_cleaned && !photos.length && <p className="muted">Tidak ada foto.</p>}
       <div className="photos">
-        {photos.map((u) => <div className="ph" key={u}><img src={u} alt="Foto jawaban" onClick={() => setZoom(u)} /></div>)}
+        {photos.map((u) => <div className="ph" key={u}><img src={u} alt="Foto jawaban" loading="lazy" decoding="async" onClick={() => setZoom(u)} /></div>)}
       </div>
     </>)}
     {task.answer_type !== 'photo' && (<>
@@ -211,7 +213,8 @@ function ByTask({ task, onBack }) {
     load()
   }
 
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await loadXlsx()
     const ws = XLSX.utils.aoa_to_sheet([['Nama', 'Kelas', 'Dikirim', 'Nilai', 'Komentar'],
       ...subs.map((s) => [s.profiles?.full_name, s.profiles?.classes?.name || '', when(s.submitted_at), s.score ?? '', s.feedback || ''])])
     ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 40 }]

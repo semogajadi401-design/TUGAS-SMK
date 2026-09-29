@@ -18,7 +18,19 @@ const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Dr
 const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto dan teks' }
 const MAX_PHOTOS = 6
 
-function compress(file, max = 1280, q = 0.7) {
+async function compress(file, max = 1280, q = 0.7) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const k = Math.min(1, max / Math.max(bmp.width, bmp.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height)
+      bmp.close?.()
+      const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', q))
+      if (b) return b
+    } catch { /* lanjut ke cara lama */ }
+  }
   return new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file)
     img.onload = () => {
@@ -148,12 +160,17 @@ function Detail({ id, profile, onBack }) {
         await supabase.storage.from('jawaban').remove(removed.map((p) => p.path))
         await supabase.from('submission_photos').delete().in('id', removed.map((p) => p.id))
       }
-      for (const [i, a] of added.entries()) {
+      // Kompres + unggah semua foto sekaligus (bukan satu per satu), lalu satu kali insert.
+      const stamp = Date.now()
+      const paths = await Promise.all(added.map(async (a, i) => {
         const blob = await compress(a.file)
-        const path = `${profile.id}/${row.id}/${Date.now()}-${i}.jpg`
+        const path = `${profile.id}/${row.id}/${stamp}-${i}.jpg`
         const up = await supabase.storage.from('jawaban').upload(path, blob, { contentType: 'image/jpeg' })
         if (up.error) throw up.error
-        const ins = await supabase.from('submission_photos').insert({ submission_id: row.id, path })
+        return path
+      }))
+      if (paths.length) {
+        const ins = await supabase.from('submission_photos').insert(paths.map((path) => ({ submission_id: row.id, path })))
         if (ins.error) throw ins.error
       }
       if (submit && task.is_group && grp?.isLeader) {
@@ -205,7 +222,7 @@ function Detail({ id, profile, onBack }) {
       <div className="photos">
         {shownPhotos.map((p) => (
           <div className="ph" key={p.id}>
-            <img src={p.url} alt="Foto jawaban" />
+            <img src={p.url} alt="Foto jawaban" loading="lazy" decoding="async" />
             {!locked && <button aria-label="Hapus foto" onClick={() => setRemoved([...removed, p])}>×</button>}
           </div>
         ))}

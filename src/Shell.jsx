@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import { Brand } from './Settings.jsx'
+import { Brand } from './brand.jsx'
 import { Art } from './Backdrop.jsx'
 import './notifs.css'
 

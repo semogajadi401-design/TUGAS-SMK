@@ -485,3 +485,22 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .prof div:last-child{border-bottom:0}
 .prof dt{color:var(--muted);font-size:.9rem}
 .prof dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}
+
+/* ---- Performa: efek latar dibuat murah ---- */
+/* drop-shadow pada garis animasi dihitung ulang tiap frame; glow diganti opacity saja */
+.streak{filter:none}
+/* percikan: hilangkan bayangan (tiap bayangan = 1 layer blur) */
+.spark,.spark.gold{box-shadow:none}
+/* kartu tidak lagi memakai backdrop-filter saat latar transparan aktif (sangat berat di HP) */
+.shell.fx-on :is(.panel,.row,.taskcard,.stat,.list,.result,.instr,.tbl-wrap,.preview,.tip,.empty-card,.task,.banner){
+  backdrop-filter:none;-webkit-backdrop-filter:none;background-color:rgba(255,255,255,.94)}
+.shell.fx-on .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(255,255,255,.94)}
+/* teks login: tanpa blur animasi (memicu repaint tiap frame) */
+.lg-line span{filter:none}
+/* layar kecil: kurangi jumlah percikan & lingkaran; kartu login tanpa blur besar */
+@media (max-width:700px){
+  .spark:nth-child(n+8),.ring,.orbit,.streak{display:none}
+  .login .card.glass{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(6,20,15,.62)}
+}
+/* animasi latar dijeda otomatis saat tab tidak terlihat */
+.paused *{animation-play-state:paused!important}

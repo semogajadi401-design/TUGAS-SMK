@@ -3,7 +3,7 @@ import { supabase } from './supabase.js'
 
 const KINDS = ['tasks', 'materials', 'grades']
 const ZERO = { tasks: 0, materials: 0, grades: 0 }
-const POLL_MS = 60000
+const POLL_MS = 120000
 
 // Menghitung tugas, materi, dan nilai yang belum dilihat siswa.
 // Penanda "terakhir dilihat" disimpan di tabel seen_marks (ikut ke perangkat mana pun).
@@ -14,7 +14,7 @@ export function useNotifs() {
   const alive = useRef(true)
 
   async function loadMarks() {
-    const uid = (await supabase.auth.getUser()).data.user?.id
+    const uid = (await supabase.auth.getSession()).data.session?.user?.id
     if (!uid) return null
     const read = async () => {
       const { data, error } = await supabase.from('seen_marks').select('kind,seen_at')
@@ -62,7 +62,7 @@ export function useNotifs() {
   useEffect(() => {
     alive.current = true
     check()
-    const id = setInterval(check, POLL_MS)
+    const id = setInterval(() => { if (document.visibilityState === 'visible') check() }, POLL_MS)
     const onVis = () => { if (document.visibilityState === 'visible') check() }
     document.addEventListener('visibilitychange', onVis)
     return () => { alive.current = false; clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
