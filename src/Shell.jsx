@@ -65,7 +65,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
       <aside className={'drawer' + (open ? ' open' : '')} aria-label="Menu">
         <div className="d-head">
           <Brand s={s} size={60} />
-          <div className="d-who"><strong>{profile.full_name}</strong><small>{role}</small></div>
+          <div className="d-who"><strong>{profile.full_name}</strong><small>{role}{profile.kelas && ` · Kelas ${profile.kelas}`}</small>{profile.code && <small>Username: {profile.code}</small>}</div>
           <button className="d-close" aria-label="Tutup menu" onClick={() => setOpen(false)}><Icon d={I.close} /></button>
         </div>
         <nav className="d-nav">
