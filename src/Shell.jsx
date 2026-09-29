@@ -65,7 +65,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
       <div className={'scrim' + (open ? ' show' : '')} onClick={() => setOpen(false)} />
       <aside className={'drawer' + (open ? ' open' : '')} aria-label="Menu">
         <div className="d-head">
-          <Brand s={s} size={60} />
+          <Brand s={s} size={50} />
           <div className="d-who"><strong>{profile.full_name}</strong><small>{role}{profile.kelas && ` · Kelas ${profile.kelas}`}</small>{profile.code && <small>Username: {profile.code}</small>}</div>
           <button className="d-close" aria-label="Tutup menu" onClick={() => setOpen(false)}><Icon d={I.close} /></button>
         </div>
@@ -77,7 +77,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
             </button>
           ))}
         </nav>
-        <button className="d-out" onClick={out}><Icon d={I.logout} />Keluar dari akun</button>
+        <button className="d-out" onClick={out}><Icon d={I.logout} size={18} />Keluar</button>
       </aside>
     </div>
   )
