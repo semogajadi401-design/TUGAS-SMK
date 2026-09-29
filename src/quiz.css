@@ -63,3 +63,7 @@ fieldset:disabled input,fieldset:disabled textarea{background:#f4f7f5}
 .qz-fill.low{background:var(--danger)}
 .qz-barwrap span{position:absolute;left:8px;top:0;line-height:22px;font-size:.78rem;font-weight:700;color:#fff;mix-blend-mode:normal;text-shadow:0 0 3px rgba(0,0,0,.5)}
 @media (prefers-reduced-motion:no-preference){.qz-fill{transition:width .4s}}
+
+/* Siswa: batang sisa waktu per soal */
+.qz-tbar{height:8px;background:#edf2ef;border-radius:99px;overflow:hidden;margin-bottom:12px}
+.qz-tbar div{height:100%;background:var(--board);border-radius:99px}

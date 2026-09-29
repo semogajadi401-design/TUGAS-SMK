@@ -27,3 +27,5 @@ Simpan skema dan RLS policy Anda sebagai file SQL di `supabase/` supaya bisa dib
 Jalankan `supabase/mapel.sql` lalu `supabase/fitur-baru.sql` (jawaban dikembalikan, tugas kelompok).
 Variabel Vercel tambahan: `CRON_SECRET` (bebas, untuk cadangan mingguan otomatis; jadwal ada di `vercel.json`).
 Endpoint: `/api/task` (ubah/hapus tugas), `/api/group` (kelompok), `/api/backup` (cadangan Excel).
+
+Quiz: jalankan `supabase/quiz.sql` lalu `supabase/durasi-per-soal.sql` (waktu per soal dalam detik, hitung mundur per soal, pindah otomatis).

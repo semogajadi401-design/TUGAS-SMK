@@ -13,7 +13,7 @@ function Editor({ id, onBack }) {
   const [locked, setLocked] = useState(false)
   const [classes, setClasses] = useState([])
   const [subjects, setSubjects] = useState([])
-  const [f, setF] = useState({ title: '', subject_id: '', instructions: '', duration_min: '', open_at: '', close_at: '', reveal: 'submit', shuffle: true, status: 'published', class_ids: [] })
+  const [f, setF] = useState({ title: '', subject_id: '', instructions: '', question_seconds: '', open_at: '', close_at: '', reveal: 'submit', shuffle: true, status: 'published', class_ids: [] })
   const [qs, setQs] = useState([newQ()])
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -26,7 +26,7 @@ function Editor({ id, onBack }) {
     if (!id) return
     api({ action: 'get', id }).then((r) => {
       const z = r.quiz
-      setF({ title: z.title, subject_id: z.subject_id || '', instructions: z.instructions || '', duration_min: z.duration_min ?? '',
+      setF({ title: z.title, subject_id: z.subject_id || '', instructions: z.instructions || '', question_seconds: z.question_seconds ?? '',
         open_at: toLocalInput(z.open_at), close_at: toLocalInput(z.close_at), reveal: z.reveal, shuffle: z.shuffle, status: z.status, class_ids: r.class_ids })
       setQs(r.questions.map((q) => ({ id: q.id, text: q.text || '', image_path: q.image_path, options: q.options, correct: q.correct, points: q.points })))
       setLocked(r.locked); setLoaded(true)
@@ -97,8 +97,8 @@ function Editor({ id, onBack }) {
       <div className="panel">
         <h3>Waktu dan hasil</h3>
         <div className="qz-2col">
-          <div><label htmlFor="qd">Durasi (menit)</label>
-            <input id="qd" type="number" min="1" max="600" value={f.duration_min} onChange={(e) => set('duration_min', e.target.value)} placeholder="Tanpa batas" /></div>
+          <div><label htmlFor="qd">Waktu per soal (detik)</label>
+            <input id="qd" type="number" min="5" max="600" value={f.question_seconds} disabled={locked} onChange={(e) => set('question_seconds', e.target.value)} placeholder="Tanpa batas" /></div>
           <div><label htmlFor="qst">Status</label>
             <select id="qst" value={f.status} onChange={(e) => set('status', e.target.value)}>
               <option value="published">Terbit (siswa bisa lihat)</option><option value="draft">Draf (disembunyikan)</option>
@@ -108,6 +108,7 @@ function Editor({ id, onBack }) {
           <div><label htmlFor="qc">Ditutup</label>
             <input id="qc" type="datetime-local" value={f.close_at} onChange={(e) => set('close_at', e.target.value)} /></div>
         </div>
+        <p className="muted" style={{ marginTop: 0 }}>Setiap soal memakai waktu ini (contoh 10 = 10 detik per soal) dengan hitung mundur. Siswa boleh mengubah jawaban selama waktu belum habis, lalu soal pindah otomatis dan tidak bisa kembali. Kosongkan jika tidak ingin membatasi waktu.{locked && ' Waktu per soal terkunci karena quiz sudah dikerjakan siswa.'}</p>
         <label htmlFor="qr">Kapan siswa melihat benar/salah</label>
         <select id="qr" value={f.reveal} onChange={(e) => set('reveal', e.target.value)}>
           <option value="submit">Langsung setelah selesai</option>
@@ -249,7 +250,7 @@ export default function Quiz() {
               {q.status === 'draft' ? <span className="chip draft">Draf</span> : <span className="chip sent">Terbit</span>}
               {q.subject && <span className="chip">{q.subject}</span>}
               <span className="chip">{q.n_questions} soal</span>
-              {q.duration_min && <span className="chip">{q.duration_min} menit</span>}
+              {q.question_seconds ? <span className="chip">{q.question_seconds} detik/soal</span> : q.duration_min ? <span className="chip">{q.duration_min} menit</span> : null}
             </div>
             <p className="muted">
               Kelas: {q.classes.join(', ') || '-'}<br />

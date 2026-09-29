@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 export const config = { maxDuration: 30 }
 
 const GRACE_MS = 45000 // toleransi jaringan setelah waktu habis
+const QGRACE_MS = 4000 // toleransi jaringan untuk jawaban per soal
 
 const shuffle = (arr) => {
   const a = [...arr]
@@ -13,14 +14,30 @@ const shuffle = (arr) => {
 const iso = (v) => { if (!v) return null; const d = new Date(v); return isNaN(d) ? null : d.toISOString() }
 const ts = (v) => (v ? new Date(v).getTime() : null)
 
-// Batas akhir mengerjakan = mulai + durasi, dan tidak boleh melewati waktu tutup quiz.
-function deadlineOf(quiz, startedAt) {
+// Batas akhir mengerjakan, dan tidak boleh melewati waktu tutup quiz.
+// Mode baru: waktu per soal (question_seconds) x jumlah soal. Mode lama: durasi total (duration_min).
+function deadlineOf(quiz, at) {
   const ends = []
-  if (quiz.duration_min) ends.push(ts(startedAt) + quiz.duration_min * 60000)
+  const n = Array.isArray(at.order) ? at.order.length : 0
+  if (quiz.question_seconds && n) ends.push(ts(at.started_at) + n * quiz.question_seconds * 1000)
+  else if (quiz.duration_min) ends.push(ts(at.started_at) + quiz.duration_min * 60000)
   if (quiz.close_at) ends.push(ts(quiz.close_at))
   return ends.length ? Math.min(...ends) : null
 }
-const isExpired = (quiz, at, now) => { const d = deadlineOf(quiz, at.started_at); return d !== null && now > d + GRACE_MS }
+const isExpired = (quiz, at, now) => { const d = deadlineOf(quiz, at); return d !== null && now > d + GRACE_MS }
+
+// Mode waktu per soal: soal ke-k (urutan siswa ini) hanya bisa dijawab/diubah selama jendela waktunya
+// [mulai + k*S, mulai + (k+1)*S]. Jawaban untuk soal yang jendelanya sudah tutup diabaikan (dicek di server).
+function openAnswers(quiz, at, incoming, now) {
+  const S = quiz.question_seconds
+  if (!S) return incoming
+  const start = ts(at.started_at)
+  const out = {}
+  ;(Array.isArray(at.order) ? at.order : []).forEach((id, k) => {
+    if (id in incoming && now <= start + (k + 1) * S * 1000 + QGRACE_MS) out[id] = incoming[id]
+  })
+  return out
+}
 
 async function inChunks(admin, table, cols, col, ids) {
   const out = []
@@ -110,7 +127,7 @@ export default async function handler(req, res) {
     if (me.role === 'teacher') {
       if (b.action === 'list') {
         const { data: qs, error } = await admin.from('quizzes')
-          .select('id,title,status,duration_min,open_at,close_at,reveal,shuffle,created_at,subjects(name)')
+          .select('id,title,status,duration_min,question_seconds,open_at,close_at,reveal,shuffle,created_at,subjects(name)')
           .order('created_at', { ascending: false })
         if (error) return fail(error, 'Gagal memuat quiz')
         const ids = (qs || []).map((q) => q.id)
@@ -152,8 +169,8 @@ export default async function handler(req, res) {
         const open_at = iso(b.open_at), close_at = iso(b.close_at)
         if (open_at && close_at && ts(close_at) <= ts(open_at)) return bad(400, 'Waktu tutup harus setelah waktu buka')
         if (reveal === 'close' && !close_at) return bad(400, 'Untuk "tampilkan hasil setelah quiz ditutup", waktu tutup wajib diisi')
-        let duration = b.duration_min === '' || b.duration_min == null ? null : parseInt(b.duration_min)
-        if (duration !== null && (!Number.isInteger(duration) || duration < 1 || duration > 600)) return bad(400, 'Durasi harus 1-600 menit')
+        const qsec = b.question_seconds === '' || b.question_seconds == null ? null : parseInt(b.question_seconds)
+        if (qsec !== null && (!Number.isInteger(qsec) || qsec < 5 || qsec > 600)) return bad(400, 'Waktu per soal harus 5-600 detik')
 
         let parsed = null
         if (b.questions !== undefined) {
@@ -164,15 +181,16 @@ export default async function handler(req, res) {
         const patch = {
           title, subject_id: b.subject_id || null,
           instructions: String(b.instructions || '').trim() ? String(b.instructions).trim().slice(0, 4000) : null,
-          duration_min: duration, open_at, close_at, reveal, status, shuffle: b.shuffle !== false,
+          duration_min: null, question_seconds: qsec, open_at, close_at, reveal, status, shuffle: b.shuffle !== false,
         }
 
         let quizId = b.id, oldImages = []
         if (quizId) {
-          const { data: ex } = await admin.from('quizzes').select('id').eq('id', quizId).maybeSingle()
+          const { data: ex } = await admin.from('quizzes').select('id,question_seconds').eq('id', quizId).maybeSingle()
           if (!ex) return bad(404, 'Quiz tidak ditemukan')
+          const { count } = await admin.from('quiz_attempts').select('id', { count: 'exact', head: true }).eq('quiz_id', quizId)
+          if (count > 0 && (ex.question_seconds ?? null) !== qsec) return bad(409, 'Quiz ini sudah dikerjakan siswa, jadi waktu per soal tidak bisa diubah.')
           if (parsed) {
-            const { count } = await admin.from('quiz_attempts').select('id', { count: 'exact', head: true }).eq('quiz_id', quizId)
             if (count > 0) return bad(409, 'Quiz ini sudah dikerjakan siswa, jadi soalnya tidak bisa diubah. Hapus hasil siswa dulu, atau buat quiz baru.')
             const { data: old } = await admin.from('quiz_questions').select('image_path').eq('quiz_id', quizId)
             oldImages = (old || []).map((q) => q.image_path).filter(Boolean)
@@ -273,7 +291,7 @@ export default async function handler(req, res) {
       if (!classId) return res.json({ quizzes: [] })
       const { data: cl } = await admin.from('quiz_classes').select('quiz_id').eq('class_id', classId)
       const ids = (cl || []).map((c) => c.quiz_id)
-      const qs = await inChunks(admin, 'quizzes', 'id,title,instructions,duration_min,open_at,close_at,reveal,status,subjects(name)', 'id', ids)
+      const qs = await inChunks(admin, 'quizzes', 'id,title,instructions,duration_min,question_seconds,open_at,close_at,reveal,status,subjects(name)', 'id', ids)
       const pub = qs.filter((q) => q.status === 'published')
       const pids = pub.map((q) => q.id)
       const qn = await inChunks(admin, 'quiz_questions', 'quiz_id', 'quiz_id', pids)
@@ -287,7 +305,7 @@ export default async function handler(req, res) {
         const state = q.open_at && now < ts(q.open_at) ? 'upcoming' : q.close_at && now > ts(q.close_at) ? 'closed' : 'open'
         out.push({
           id: q.id, title: q.title, subject: q.subjects?.name || '', instructions: q.instructions,
-          duration_min: q.duration_min, open_at: q.open_at, close_at: q.close_at,
+          duration_min: q.duration_min, question_seconds: q.question_seconds, open_at: q.open_at, close_at: q.close_at,
           n_questions: qn.filter((x) => x.quiz_id === q.id).length,
           state, attempt: !at ? 'none' : at.finished_at ? 'done' : 'progress',
           result_ready: !!at?.finished_at && !resultView(q, at, now).hidden,
@@ -328,10 +346,12 @@ export default async function handler(req, res) {
         const { data: su } = await admin.storage.from('lampiran').createSignedUrls(withImg.map((q) => q.image_path), 3600)
         withImg.forEach((q, i) => { if (su?.[i]?.signedUrl) urls.set(q.id, su[i].signedUrl) })
       }
-      const d = deadlineOf(quiz, at.started_at)
+      const d = deadlineOf(quiz, at)
       return res.json({
         done: false,
         quiz: { id: quiz.id, title: quiz.title, instructions: quiz.instructions, duration_min: quiz.duration_min },
+        question_seconds: quiz.question_seconds || null,
+        started_at: at.started_at,
         deadline: d ? new Date(d).toISOString() : null,
         server_now: new Date(now).toISOString(),
         answers: at.answers || {},
@@ -350,7 +370,7 @@ export default async function handler(req, res) {
       if (b.action === 'save') { // simpan otomatis berkala, supaya jawaban tidak hilang saat koneksi putus
         if (late) return bad(403, 'Waktu sudah habis', { expired: true })
         const { data: qs } = await admin.from('quiz_questions').select('id,options').eq('quiz_id', quiz.id)
-        const merged = { ...(at.answers || {}), ...cleanAnswers(b.answers, qs || []) }
+        const merged = { ...(at.answers || {}), ...openAnswers(quiz, at, cleanAnswers(b.answers, qs || []), now) }
         const u = await admin.from('quiz_attempts').update({ answers: merged }).eq('id', at.id).is('finished_at', null)
         if (u.error) return fail(u.error, 'Gagal menyimpan jawaban')
         return res.json({ ok: true })
@@ -360,7 +380,7 @@ export default async function handler(req, res) {
       let answers = at.answers || {}
       if (!late) {
         const { data: qs } = await admin.from('quiz_questions').select('id,options').eq('quiz_id', quiz.id)
-        answers = { ...answers, ...cleanAnswers(b.answers, qs || []) }
+        answers = { ...answers, ...openAnswers(quiz, at, cleanAnswers(b.answers, qs || []), now) }
       }
       const done = await finish(admin, at, answers)
       return res.json(resultView(quiz, done, now))
