@@ -22,7 +22,7 @@ function Ring({ pct }) {
   )
 }
 
-export default function Home({ profile, goAccount }) {
+export default function Home({ profile, goAccount, onOpen }) {
   const [rows, setRows] = useState(null)
 
   useEffect(() => {
@@ -75,10 +75,10 @@ export default function Home({ profile, goAccount }) {
         {todo.map((t) => {
           const di = dueInfo(t.due_at)
           return (
-            <div className="task" key={t.id}>
+            <button className="task" key={t.id} onClick={() => onOpen?.(t.id)}>
               <div><b>{t.title}</b></div>
               <span className={'chip ' + di.c}>{di.t}</span>
-            </div>
+            </button>
           )
         })}
       </>)

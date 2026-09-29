@@ -5,6 +5,7 @@ import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
 import Tasks from './Tasks.jsx'
+import StudentTasks, { Grades } from './StudentTasks.jsx'
 import Settings, { loadSettings, DEFAULTS } from './Settings.jsx'
 import Shell, { I } from './Shell.jsx'
 
@@ -41,6 +42,8 @@ const Soon = ({ text }) => <div className="empty">{text}</div>
 
 function Student({ profile, reload, s }) {
   const [tab, setTab] = useState('home')
+  const [openId, setOpenId] = useState(null)
+  const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
@@ -48,10 +51,10 @@ function Student({ profile, reload, s }) {
     { k: 'account', label: 'Akun', icon: I.user },
   ]
   return (
-    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={setTab}>
-      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} />}
-      {tab === 'tasks' && <Soon text="Daftar dan pengerjaan tugas segera hadir." />}
-      {tab === 'grades' && <Soon text="Riwayat nilai segera hadir." />}
+    <Shell s={s} profile={profile} role="Siswa" items={items} tab={tab} setTab={go}>
+      {tab === 'home' && <Home profile={profile} goAccount={() => setTab('account')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
+      {tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
         <h2>Ubah password</h2>
         <ChangePassword onDone={reload} />
