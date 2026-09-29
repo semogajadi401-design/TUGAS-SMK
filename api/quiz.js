@@ -315,6 +315,35 @@ export default async function handler(req, res) {
       return res.json({ quizzes: out })
     }
 
+    // Penanda "terakhir dilihat" (dipakai badge angka merah). Ditulis lewat server supaya pasti tersimpan.
+    if (b.action === 'seen') {
+      const kind = String(b.kind || '')
+      if (!['tasks', 'materials', 'grades', 'quiz'].includes(kind)) return bad(400, 'Jenis penanda tidak valid')
+      const r = await admin.from('seen_marks').upsert({ user_id: me.id, kind, seen_at: new Date().toISOString() }, { onConflict: 'user_id,kind' })
+      if (r.error) return fail(r.error, 'Gagal menyimpan penanda')
+      return res.json({ ok: true })
+    }
+
+    // Quiz baru: terbit sejak terakhir siswa membuka menu Quiz, belum dikerjakan, dan belum ditutup.
+    if (b.action === 'news') {
+      const none = { count: 0, titles: [] }
+      if (!classId) return res.json(none)
+      const { data: mk } = await admin.from('seen_marks').select('seen_at').eq('user_id', me.id).eq('kind', 'quiz').maybeSingle()
+      if (!mk) { // pertama kali: quiz yang sudah ada dianggap sudah dilihat
+        await admin.from('seen_marks').upsert({ user_id: me.id, kind: 'quiz', seen_at: new Date().toISOString() }, { onConflict: 'user_id,kind' })
+        return res.json(none)
+      }
+      const since = ts(mk.seen_at)
+      const { data: cl } = await admin.from('quiz_classes').select('quiz_id').eq('class_id', classId)
+      const qs = await inChunks(admin, 'quizzes', 'id,title,created_at,status,close_at', 'id', (cl || []).map((c) => c.quiz_id))
+      const { data: mine } = await admin.from('quiz_attempts').select('quiz_id').eq('student_id', me.id)
+      const tried = new Set((mine || []).map((x) => x.quiz_id))
+      const fresh = qs
+        .filter((q) => q.status === 'published' && ts(q.created_at) > since && !tried.has(q.id) && !(q.close_at && now > ts(q.close_at)))
+        .sort((x, y) => ts(y.created_at) - ts(x.created_at))
+      return res.json({ count: fresh.length, titles: fresh.slice(0, 3).map((q) => q.title) })
+    }
+
     if (b.action === 'grades') { // daftar nilai quiz milik siswa yang sedang login
       const { data: mine } = await admin.from('quiz_attempts').select('*').eq('student_id', me.id)
       const ids = (mine || []).map((x) => x.quiz_id)
