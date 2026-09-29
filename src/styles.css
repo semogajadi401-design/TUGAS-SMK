@@ -339,3 +339,36 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .form .err{margin:16px 0 0}
 .actions{position:sticky;bottom:-22px;margin:24px -18px 0;padding:14px 18px calc(var(--sab) + 14px);
   background:linear-gradient(rgba(245,246,248,0),var(--paper) 28%)}
+
+/* ---- Login premium ---- */
+.login{padding:0;display:block;color:#fff;
+  background:
+    radial-gradient(55% 45% at 88% 8%,color-mix(in srgb,var(--chalk) 38%,transparent),transparent 62%),
+    radial-gradient(70% 55% at 8% 95%,color-mix(in srgb,var(--board) 75%,#5fe0c0 25%),transparent 65%),
+    radial-gradient(45% 40% at 55% 55%,color-mix(in srgb,var(--board) 60%,transparent),transparent 70%),
+    linear-gradient(140deg,#03100c 0%,color-mix(in srgb,var(--board) 48%,black) 55%,#061711 100%)}
+.art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.login-in{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;gap:28px;
+  padding:calc(var(--sat) + 36px) 22px calc(var(--sab) + 22px)}
+.lg-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.lg-brand strong{font-size:1rem;font-weight:700;letter-spacing:-.01em}
+.lg-msg{margin:0;font-size:clamp(1.65rem,7vw,2.1rem);font-weight:800;line-height:1.18;letter-spacing:-.03em;
+  min-height:5.4em;max-width:16em;animation:lgIn .7s ease both}
+.lg-dots{display:flex;gap:8px;margin-top:14px}
+.lg-dots button{width:8px;height:8px;padding:0;border:0;border-radius:99px;background:rgba(255,255,255,.28);
+  cursor:pointer;transition:width .3s,background .3s}
+.lg-dots button.on{width:26px;background:var(--chalk)}
+.lg-sub{margin:18px 0 0;color:rgba(255,255,255,.66);font-size:.95rem}
+.login .card{margin-top:auto;background:rgba(255,255,255,.97);color:var(--ink);border-radius:22px;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.35)}
+.login .glass{padding:26px 22px 22px}
+@keyframes lgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (min-width:900px){
+  .login-in{flex-direction:row;align-items:center;justify-content:space-between;gap:64px;
+    max-width:1240px;margin:0 auto;padding:56px 64px}
+  .lg-left{flex:1;max-width:600px}
+  .lg-brand{margin-bottom:64px}
+  .lg-msg{font-size:clamp(2.4rem,3.6vw,3.4rem);min-height:4.8em}
+  .login .card{margin:0;width:400px;flex:none}
+}
+@media (prefers-reduced-motion:reduce){.lg-msg{animation:none}.lg-dots button{transition:none}}
