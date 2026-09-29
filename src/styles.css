@@ -504,3 +504,25 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 }
 /* animasi latar dijeda otomatis saat tab tidak terlihat */
 .paused *{animation-play-state:paused!important}
+
+/* ---- Beranda guru ---- */
+.sec-head{display:flex;justify-content:space-between;align-items:baseline}
+.sum-btn{margin:14px 0 0;padding:10px 16px;border:0;border-radius:10px;background:var(--chalk);color:#3a2b00;font:inherit;font-weight:700;cursor:pointer}
+.sum .facts{gap:0;justify-content:space-between}
+.sum .facts div{flex:1}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:26px}
+.quick button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;color:var(--board);font:inherit;font-size:.78rem;font-weight:600;cursor:pointer}
+.quick button:hover,.quick button:active{background:#f4f7f5}
+.count{font-weight:700;font-variant-numeric:tabular-nums;color:var(--board);white-space:nowrap}
+.count small{font-weight:500;color:var(--muted);font-size:.8rem}
+.item.total{background:#f4f7f5}
+.mini{display:block;height:5px;margin-top:6px;border-radius:99px;background:#edf2ef;overflow:hidden}
+.mini i{display:block;height:100%;background:var(--board);border-radius:99px}
+.list.sys{padding:0}
+.sys-row{padding:14px 16px;border-bottom:1px solid var(--line)}
+.sys-row:last-child{border-bottom:0}
+.sys-h{display:flex;justify-content:space-between;margin-bottom:8px;font-size:.92rem}
+.sys-h b{color:var(--board)}
+.sys-row .muted{margin:8px 0 0}
+.home .panel{border-radius:16px;margin-bottom:26px}
