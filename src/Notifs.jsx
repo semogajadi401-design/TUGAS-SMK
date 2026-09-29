@@ -36,22 +36,27 @@ export function useNotifs() {
   async function check() {
     const m = await loadMarks()
     if (!m || !alive.current) return
-    const [t, mt, g] = await Promise.all([
-      supabase.from('assignments').select('id,title', { count: 'exact' }).eq('status', 'active')
-        .gt('created_at', m.tasks).order('created_at', { ascending: false }).limit(3),
+    const [t, mine, mt, g] = await Promise.all([
+      // Tanpa limit: daftar difilter di sisi klien agar tugas yang sudah dikerjakan tidak ikut terhitung.
+      supabase.from('assignments').select('id,title').eq('status', 'active')
+        .gt('created_at', m.tasks).order('created_at', { ascending: false }),
+      supabase.from('submissions').select('assignment_id'),
       supabase.from('materials').select('id,title', { count: 'exact' })
         .gt('created_at', m.materials).order('created_at', { ascending: false }).limit(3),
       supabase.from('submissions').select('id,assignments(title)', { count: 'exact' })
         .not('score', 'is', null).gt('graded_at', m.grades).order('graded_at', { ascending: false }).limit(3),
     ])
     if (!alive.current) return
-    const c = { tasks: t.count ?? 0, materials: mt.count ?? 0, grades: g.count ?? 0 }
+    // Tugas yang sudah pernah dikerjakan/dikirim/dinilai bukan lagi "tugas baru".
+    const done = new Set((mine.data || []).map((x) => x.assignment_id))
+    const newTasks = (t.data || []).filter((x) => !done.has(x.id))
+    const c = { tasks: newTasks.length, materials: mt.count ?? 0, grades: g.count ?? 0 }
     setCounts(c)
     if (first.current) {
       first.current = false
       if (c.tasks + c.materials + c.grades > 0) {
         setPopup({
-          tasks: { n: c.tasks, titles: (t.data || []).map((x) => x.title) },
+          tasks: { n: c.tasks, titles: newTasks.slice(0, 3).map((x) => x.title) },
           materials: { n: c.materials, titles: (mt.data || []).map((x) => x.title) },
           grades: { n: c.grades, titles: (g.data || []).map((x) => x.assignments?.title).filter(Boolean) },
         })
