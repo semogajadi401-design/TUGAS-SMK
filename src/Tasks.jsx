@@ -178,15 +178,25 @@ export default function Tasks({ profile }) {
   const [data, setData] = useState(null)
   const [subj, setSubj] = useState('')
 
+  const [loadErr, setLoadErr] = useState('')
+
   async function load() {
-    const [a, subs, st] = await Promise.all([
-      supabase.from('assignments')
-        .select('id,title,instructions,due_at,answer_type,status,is_group,attachment_path,subject_id,subjects(name),assignment_classes(class_id,classes(name))')
-        .order('created_at', { ascending: false }),
-      fetchAll(() => supabase.from('submissions').select('id,assignment_id,student_id,status,score,submitted_at,return_note').order('id')),
-      supabase.from('profiles').select('id,full_name,class_id').eq('role', 'student').eq('active', true).order('full_name'),
-    ])
-    setData({ tasks: a.data || [], subs, studs: st.data || [] })
+    setLoadErr('')
+    try {
+      const [a, subs, st] = await Promise.all([
+        supabase.from('assignments')
+          .select('id,title,instructions,due_at,answer_type,status,is_group,attachment_path,subject_id,subjects(name),assignment_classes(class_id,classes(name))')
+          .order('created_at', { ascending: false }),
+        fetchAll(() => supabase.from('submissions').select('id,assignment_id,student_id,status,score,submitted_at,return_note').order('id')),
+        supabase.from('profiles').select('id,full_name,class_id').eq('role', 'student').eq('active', true).order('full_name'),
+      ])
+      if (a.error) throw new Error('Tabel tugas: ' + a.error.message)
+      if (st.error) throw new Error('Data siswa: ' + st.error.message)
+      setData({ tasks: a.data || [], subs, studs: st.data || [] })
+    } catch (e) {
+      setLoadErr(e.message || String(e))
+      setData({ tasks: [], subs: [], studs: [] })
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -215,6 +225,7 @@ export default function Tasks({ profile }) {
         </select>
       )
     })()}
+    {loadErr && <div className="err" role="alert">Gagal memuat: {loadErr} <button className="link" onClick={load}>Coba lagi</button></div>}
     {data === null && <div className="empty">Memuat...</div>}
     {data && !data.tasks.length && <div className="empty">Belum ada tugas. Klik Buat tugas baru untuk memulai.</div>}
     {data && data.tasks.filter((t) => !subj || t.subject_id === subj).map((t) => {
