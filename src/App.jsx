@@ -29,6 +29,8 @@ const Calendar = lazyRetry(() => import('./Calendar.jsx'))
 const Recap = lazyRetry(() => import('./Recap.jsx'))
 const Materials = lazyRetry(() => import('./Materials.jsx'))
 const StudentMaterials = lazyRetry(() => import('./StudentMaterials.jsx'))
+const Quiz = lazyRetry(() => import('./Quiz.jsx'))
+const StudentQuiz = lazyRetry(() => import('./StudentQuiz.jsx'))
 const Wait = <div className="empty">Memuat...</div>
 
 // Batas waktu supaya layar tidak menggantung selamanya saat server tidak merespons.
@@ -99,6 +101,7 @@ function Student({ profile, reload, s }) {
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks, badge: nt.counts.tasks },
     { k: 'materials', label: 'Materi', icon: I.book, badge: nt.counts.materials },
+    { k: 'quiz', label: 'Quiz', icon: I.quiz },
     { k: 'calendar', label: 'Kalender', icon: I.calendar },
     { k: 'grades', label: 'Nilai', icon: I.star, badge: nt.counts.grades },
     { k: 'account', label: 'Akun', icon: I.user },
@@ -110,6 +113,7 @@ function Student({ profile, reload, s }) {
       {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
       {tab === 'materials' && <StudentMaterials />}
+      {tab === 'quiz' && <StudentQuiz />}
       {tab === 'calendar' && <Calendar onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
@@ -135,6 +139,7 @@ function Teacher({ profile, s, onSaved }) {
     { k: 'dash', label: 'Dasbor', icon: I.grid },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
     { k: 'materials', label: 'Materi', icon: I.book },
+    { k: 'quiz', label: 'Quiz', icon: I.quiz },
     { k: 'grading', label: 'Penilaian', icon: I.check },
     { k: 'recap', label: 'Rekap Nilai', icon: I.table },
     { k: 'students', label: 'Siswa & Kelas', icon: I.users },
@@ -146,6 +151,7 @@ function Teacher({ profile, s, onSaved }) {
       {tab === 'dash' && <Dashboard profile={profile} go={setTab} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
+      {tab === 'quiz' && <Quiz />}
       {tab === 'grading' && <Grading />}
       {tab === 'recap' && <Recap />}
       {tab === 'students' && <Students />}
