@@ -6,10 +6,13 @@ const OPTS = [
   { k: 'photos', t: 'Foto jawaban siswa', d: 'Foto dihapus dari penyimpanan. Nilai dan jawaban teks tetap ada.' },
   { k: 'submissions', t: 'Semua jawaban siswa', d: 'Jawaban, foto, dan nilai dihapus. Tugas tetap ada.', needs: ['photos', 'scores'] },
   { k: 'assignments', t: 'Semua tugas', d: 'Tugas beserta lampiran, jawaban, foto, dan nilai dihapus.', needs: ['submissions'] },
+  { k: 'quizresults', t: 'Hasil quiz siswa', d: 'Semua percobaan dan nilai quiz siswa dihapus. Quiz dan soalnya tetap ada, jadi bisa dikerjakan ulang.' },
+  { k: 'quizzes', t: 'Semua quiz', d: 'Quiz beserta soal, kunci jawaban, gambar soal, dan hasil siswa dihapus.', needs: ['quizresults'] },
+  { k: 'materials', t: 'Semua materi', d: 'Materi beserta file PDF-nya dihapus.' },
   { k: 'passwords', t: 'Password semua siswa ke kode awal', d: 'Semua siswa aktif kembali memakai kodenya sebagai password.' },
-  { k: 'students', t: 'Semua akun siswa', d: 'Akun siswa dihapus permanen beserta jawabannya. Akun guru aman.', needs: ['submissions'] },
-  { k: 'classes', t: 'Daftar kelas', d: 'Kelas dihapus. Siswa yang tersisa menjadi tanpa kelas.' },
-  { k: 'subjects', t: 'Daftar mata pelajaran', d: 'Mapel dihapus. Tugas yang tersisa menjadi tanpa mapel.' },
+  { k: 'students', t: 'Semua akun siswa', d: 'Akun siswa dihapus permanen beserta jawaban, hasil quiz, dan kelompok tugasnya. Akun guru aman.', needs: ['submissions', 'quizresults'] },
+  { k: 'classes', t: 'Daftar kelas', d: 'Kelas dihapus, termasuk penugasan tugas, quiz, dan materi ke kelas itu. Siswa yang tersisa menjadi tanpa kelas.' },
+  { k: 'subjects', t: 'Daftar mata pelajaran', d: 'Mapel dihapus. Tugas, quiz, dan materi yang tersisa menjadi tanpa mapel.' },
 ]
 const NAME = Object.fromEntries(OPTS.map((o) => [o.k, o.t]))
 
