@@ -1,0 +1,81 @@
+/* src/components/PdfButton.css */
+.pdf-btn {
+  --pdf-blue: #2b5bea;
+  --pdf-blue-dark: #1f45c0;
+  --pdf-ink: #16213e;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 68px;               /* cukup besar untuk jempol */
+  padding: 10px 12px 10px 10px;
+  border-radius: 18px;
+  background: #fff;
+  border: 2px solid var(--pdf-blue);
+  box-shadow: 0 6px 18px rgba(43, 91, 234, 0.18);
+  color: var(--pdf-ink);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.pdf-btn:active {
+  transform: scale(0.98);
+  background: #f0f4ff;
+  box-shadow: 0 2px 8px rgba(43, 91, 234, 0.2);
+}
+.pdf-btn:focus-visible { outline: 3px solid #f0a500; outline-offset: 3px; }
+
+.pdf-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--pdf-blue);
+}
+.pdf-icon svg,
+.pdf-action svg {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pdf-text {
+  flex: 1;
+  min-width: 0;                   /* supaya nama file panjang bisa dipotong */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+.pdf-title { font-size: 16px; font-weight: 700; line-height: 1.25; }
+.pdf-file {
+  font-size: 13px;
+  color: #5b6484;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 12px 9px 16px;
+  border-radius: 999px;
+  background: var(--pdf-blue);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.pdf-btn:active .pdf-action { background: var(--pdf-blue-dark); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pdf-btn { transition: none; }
+}
