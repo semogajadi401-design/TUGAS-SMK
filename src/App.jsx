@@ -6,6 +6,7 @@ import Home from './Home.jsx'
 import Shell, { I } from './Shell.jsx'
 import { useNotifs, NotifPopup } from './Notifs.jsx'
 import { loadSettings, DEFAULTS } from './brand.jsx'
+import Welcome, { hasSeenWelcome, markWelcomeSeen } from './Welcome.jsx'
 
 // Jika file tab gagal diunduh (biasanya karena baru ada versi baru), muat ulang halaman satu kali.
 const lazyRetry = (load) => lazy(() => load().catch((e) => {
@@ -96,6 +97,14 @@ function Student({ profile, reload, s }) {
       .then((r) => setKelas(r.data?.name || ''))
   }, [profile.class_id])
   const me = { ...profile, kelas }
+  // Pesan sambutan: tampil sekali saja, saat siswa pertama kali masuk.
+  const [welcome, setWelcome] = useState(false)
+  useEffect(() => {
+    let off = false
+    hasSeenWelcome(profile.id).then((seen) => { if (!off && !seen) setWelcome(true) })
+    return () => { off = true }
+  }, [profile.id])
+  const closeWelcome = () => { markWelcomeSeen(profile.id); setWelcome(false) }
   useEffect(() => { if (['tasks', 'materials', 'grades', 'quiz'].includes(tab)) nt.markSeen(tab) }, [tab])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
@@ -108,6 +117,7 @@ function Student({ profile, reload, s }) {
   ]
   return (
     <Shell s={s} profile={me} role="Siswa" items={items} tab={tab} setTab={go}>
+      {welcome && <Welcome name={profile.full_name.split(' ')[0]} onClose={closeWelcome} />}
       <Boundary key={tab}><Suspense fallback={Wait}>
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
       {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
