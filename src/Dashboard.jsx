@@ -35,12 +35,11 @@ export default function Dashboard({ profile, go, online = {} }) {
   useEffect(() => {
     (async () => {
       const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString()
-      const [studs, tasks, waiting, graded, storage, due, recent] = await Promise.all([
+      const [studs, tasks, waiting, graded, due, recent] = await Promise.all([
         supabase.from('profiles').select('password_changed,class_id,classes(name)').eq('role', 'student').eq('active', true),
         cnt(supabase.from('assignments').select('id', { count: 'exact', head: true }).eq('status', 'active')),
         cnt(supabase.from('submissions').select('id', { count: 'exact', head: true }).eq('status', 'submitted').is('score', null)),
         cnt(supabase.from('submissions').select('id', { count: 'exact', head: true }).not('score', 'is', null).gte('graded_at', weekAgo)),
-        supabase.rpc('storage_usage_bytes'),
         supabase.from('assignments').select('id,title,due_at,subjects(name),assignment_classes(class_id)')
           .eq('status', 'active').not('due_at', 'is', null).order('due_at').limit(30),
         supabase.from('submissions').select('id,submitted_at,score,profiles(full_name,classes(name)),assignments(title)')
@@ -77,8 +76,10 @@ export default function Dashboard({ profile, go, online = {} }) {
         students: list.length, tasks, waiting, graded, classes, deadlines,
         recent: recent.data || [],
         unchanged: list.filter((x) => !x.password_changed).length,
-        mb: (Number(storage.data) || 0) / 1048576,
+        mb: null,
       })
+      // Hitung pemakaian penyimpanan terpisah: beranda tampil dulu, angkanya menyusul.
+      supabase.rpc('storage_usage_bytes').then((r) => setD((x) => x && { ...x, mb: (Number(r.data) || 0) / 1048576 }), () => {})
     })().catch(() => setD({ students: 0, tasks: 0, waiting: 0, graded: 0, classes: [], deadlines: [], recent: [], unchanged: 0, mb: 0 }))
   }, [])
 
@@ -87,7 +88,7 @@ export default function Dashboard({ profile, go, online = {} }) {
   const onList = Object.values(online)
   const realClasses = d.classes.filter(([n]) => n !== 'Tanpa kelas').length
   const pwPct = d.students ? Math.round(((d.students - d.unchanged) / d.students) * 100) : 0
-  const stPct = Math.min(100, (d.mb / 1024) * 100)
+  const stPct = d.mb == null ? 0 : Math.min(100, (d.mb / 1024) * 100)
 
   return (
     <div className="home">
@@ -203,7 +204,7 @@ export default function Dashboard({ profile, go, online = {} }) {
           </p>
         </div>
         <div className="sys-row">
-          <div className="sys-h"><span>Penyimpanan foto</span><b>{d.mb.toFixed(1)} MB</b></div>
+          <div className="sys-h"><span>Penyimpanan foto</span><b>{d.mb == null ? '...' : d.mb.toFixed(1) + ' MB'}</b></div>
           <div className={'meter' + (stPct > 80 ? ' warn' : '')}><i style={{ width: Math.max(2, stPct) + '%' }} /></div>
           <p className="muted">
             Dari sekitar 1 GB.{stPct > 80 && ' Hampir penuh, bersihkan foto tugas yang sudah dinilai.'}
