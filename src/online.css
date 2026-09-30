@@ -1,0 +1,13 @@
+.on-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#22a559;margin-right:6px;
+  box-shadow:0 0 0 0 rgba(34,165,89,.6);animation:on-pulse 2s infinite;vertical-align:middle}
+@keyframes on-pulse{70%{box-shadow:0 0 0 7px rgba(34,165,89,0)}100%{box-shadow:0 0 0 0 rgba(34,165,89,0)}}
+.badge.on{background:#e3f6ea;color:#14713a}
+.onl{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
+.onl-h{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.onl-h b{font-size:1.6rem;line-height:1}
+.onl-h small{color:var(--muted)}
+.onl-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.onl-list span{background:#e3f6ea;color:#14713a;font-size:.8rem;padding:4px 10px;border-radius:99px}
+.onl-list .more{background:#eef0ec;color:var(--muted)}
+.seen{font-size:.8rem;color:var(--muted);margin-top:2px}
+@media (prefers-reduced-motion:reduce){.on-dot{animation:none}}
