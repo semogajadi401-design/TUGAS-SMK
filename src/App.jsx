@@ -6,6 +6,7 @@ import Home from './Home.jsx'
 import Shell, { I } from './Shell.jsx'
 import { useNotifs, NotifPopup } from './Notifs.jsx'
 import { loadSettings, DEFAULTS } from './brand.jsx'
+import { useStudentPresence, useOnlineStudents } from './presence.jsx'
 import Welcome, { hasSeenWelcome, markWelcomeSeen } from './Welcome.jsx'
 
 // Jika file tab gagal diunduh (biasanya karena baru ada versi baru), muat ulang halaman satu kali.
@@ -97,6 +98,7 @@ function Student({ profile, reload, s }) {
       .then((r) => setKelas(r.data?.name || ''))
   }, [profile.class_id])
   const me = { ...profile, kelas }
+  useStudentPresence(profile, kelas)
   // Pesan sambutan: tampil sekali saja, saat siswa pertama kali masuk.
   const [welcome, setWelcome] = useState(false)
   useEffect(() => {
@@ -145,6 +147,7 @@ function Student({ profile, reload, s }) {
 
 function Teacher({ profile, s, onSaved }) {
   const [tab, setTab] = useState('dash')
+  const online = useOnlineStudents()
   const items = [
     { k: 'dash', label: 'Dasbor', icon: I.grid },
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
@@ -158,13 +161,13 @@ function Teacher({ profile, s, onSaved }) {
   return (
     <Shell s={s} profile={profile} role="Guru" items={items} tab={tab} setTab={setTab}>
       <Boundary key={tab}><Suspense fallback={Wait}>
-      {tab === 'dash' && <Dashboard profile={profile} go={setTab} />}
+      {tab === 'dash' && <Dashboard profile={profile} go={setTab} online={online} />}
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
       {tab === 'quiz' && <Quiz />}
       {tab === 'grading' && <Grading />}
       {tab === 'recap' && <Recap />}
-      {tab === 'students' && <Students />}
+      {tab === 'students' && <Students online={online} />}
       {tab === 'settings' && <Settings s={s} onSaved={onSaved} />}
       </Suspense></Boundary>
     </Shell>
