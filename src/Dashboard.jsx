@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 import Missing from './Missing.jsx'
 import { Icon, I } from './Shell.jsx'
+import { OnlineDot } from './presence.jsx'
 
 const greet = () => {
   const h = new Date().getHours()
@@ -28,7 +29,7 @@ const ago = (d) => {
   return `${Math.round(h / 24)} hari lalu`
 }
 
-export default function Dashboard({ profile, go }) {
+export default function Dashboard({ profile, go, online = {} }) {
   const [d, setD] = useState(null)
 
   useEffect(() => {
@@ -83,6 +84,7 @@ export default function Dashboard({ profile, go }) {
 
   if (!d) return <div className="empty">Memuat beranda...</div>
 
+  const onList = Object.values(online)
   const realClasses = d.classes.filter(([n]) => n !== 'Tanpa kelas').length
   const pwPct = d.students ? Math.round(((d.students - d.unchanged) / d.students) * 100) : 0
   const stPct = Math.min(100, (d.mb / 1024) * 100)
@@ -109,6 +111,19 @@ export default function Dashboard({ profile, go }) {
           <div><dt>Kelas</dt><dd>{realClasses}</dd></div>
           <div><dt>Tugas aktif</dt><dd>{d.tasks}</dd></div>
         </dl>
+      </section>
+
+      <section className="onl" aria-live="polite" aria-label="Siswa online">
+        <div className="onl-h">
+          <OnlineDot /><b>{onList.length}</b> siswa sedang online <small>dari {d.students} siswa aktif</small>
+        </div>
+        {onList.length > 0 && (
+          <div className="onl-list">
+            {onList.slice(0, 8).map((x, i) => <span key={i}>{x.name}{x.kelas && ` · ${x.kelas}`}</span>)}
+            {onList.length > 8 && <span className="more">+{onList.length - 8} lainnya</span>}
+          </div>
+        )}
+        {go && <button className="link" onClick={() => go('students')}>Lihat riwayat login</button>}
       </section>
 
       {go && (
