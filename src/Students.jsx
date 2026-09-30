@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
 import { OnlineDot, fmtWhen } from './presence.jsx'
 import { loadXlsx } from './util.js'
@@ -241,7 +241,11 @@ export default function Students({ online = {} }) {
   useEffect(() => { load() }, [])
   // Saat ada siswa masuk/keluar, segarkan riwayat login (ditunda agar tidak berat).
   const onlineKey = Object.keys(online).sort().join(',')
-  useEffect(() => { const t = setTimeout(load, 3000); return () => clearTimeout(t) }, [onlineKey])
+  const firstSync = useRef(true)
+  useEffect(() => {
+    if (firstSync.current) { firstSync.current = false; return }   // muat pertama sudah dilakukan di atas
+    const t = setTimeout(load, 10000); return () => clearTimeout(t)
+  }, [onlineKey])
 
   const classes = useMemo(() => [...new Set((list || []).map((s) => s.classes?.name).filter(Boolean))].sort(), [list])
   const nOn = Object.keys(online).length
