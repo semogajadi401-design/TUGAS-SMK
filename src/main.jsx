@@ -1,8 +1,9 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import Splash from './Splash.jsx'
 import './styles.css'
-createRoot(document.getElementById('root')).render(<App />)
+createRoot(document.getElementById('root')).render(<><App /><Splash /></>)
 
 // Jeda animasi latar saat tab tidak terlihat.
 document.addEventListener('visibilitychange', () =>
