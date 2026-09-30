@@ -14,6 +14,7 @@ function MaterialForm({ profile, item, onDone, onCancel }) {
   const [dropFile, setDropFile] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [stage, setStage] = useState('')
 
   useEffect(() => {
     supabase.from('classes').select('id,name').order('name').then((r) => setClasses(r.data || []))
@@ -41,34 +42,56 @@ function MaterialForm({ profile, item, onDone, onCancel }) {
     let uploaded = null
     try {
       const id = edit ? item.id : crypto.randomUUID()
-      const row = { title, content: content || null, subject_id: f.subject || null }
+      const setFileCols = !!file || (edit && dropFile)
+      let filePath = null, fileName = null
       if (file) {
+        setStage(`Mengunggah PDF (${(file.size / 1048576).toFixed(1)} MB)...`)
         uploaded = `${id}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
         const up = await supabase.storage.from('materi').upload(uploaded, file, { contentType: 'application/pdf' })
         if (up.error) throw up.error
-        row.file_path = uploaded; row.file_name = file.name
-      } else if (edit && dropFile) { row.file_path = null; row.file_name = null }
+        filePath = uploaded; fileName = file.name
+      }
+      setStage('Menyimpan materi...')
 
-      if (edit) {
-        const u = await supabase.from('materials').update(row).eq('id', id)
-        if (u.error) throw u.error
-        const d = await supabase.from('material_classes').delete().eq('material_id', id)
-        if (d.error) throw d.error
-      } else {
-        const i = await supabase.from('materials').insert({ id, ...row, created_by: profile.id })
-        if (i.error) throw i.error
+      // Cara cepat: semua penulisan database dalam SATU permintaan (butuh supabase/simpan-materi.sql).
+      const r = await supabase.rpc('save_material', {
+        p_id: id, p_title: title, p_content: content || null, p_subject: f.subject || null,
+        p_classes: picked, p_file_path: filePath, p_file_name: fileName, p_set_file: setFileCols,
+      })
+      if (r.error) {
+        const missing = r.error.code === 'PGRST202' || /could not find the function|save_material/i.test(r.error.message || '')
+        if (!missing) throw r.error
+        await saveSlow(id, title, content, setFileCols, filePath, fileName) // cadangan bila SQL belum dijalankan
       }
-      const c = await supabase.from('material_classes').insert(picked.map((class_id) => ({ material_id: id, class_id })))
-      if (c.error) {
-        if (!edit) await supabase.from('materials').delete().eq('id', id)
-        throw c.error
-      }
-      if (edit && item.file_path && (file || dropFile)) await supabase.storage.from('materi').remove([item.file_path])
+      // Hapus file lama di latar belakang: guru tidak perlu menunggu.
+      if (edit && item.file_path && setFileCols) supabase.storage.from('materi').remove([item.file_path]).catch(() => {})
       onDone()
     } catch (x) {
-      if (uploaded) await supabase.storage.from('materi').remove([uploaded])
+      if (uploaded) await supabase.storage.from('materi').remove([uploaded]).catch(() => {})
       setErr('Gagal menyimpan: ' + (x.message || x))
-      setBusy(false)
+      setBusy(false); setStage('')
+    }
+  }
+
+  // Cara lama (berurutan, lebih lambat). Dipakai hanya jika fungsi save_material belum ada.
+  async function saveSlow(id, title, content, setFileCols, filePath, fileName) {
+    const row = { title, content: content || null, subject_id: f.subject || null }
+    if (setFileCols) { row.file_path = filePath; row.file_name = fileName }
+    if (edit) {
+      const [u, d] = await Promise.all([
+        supabase.from('materials').update(row).eq('id', id),
+        supabase.from('material_classes').delete().eq('material_id', id),
+      ])
+      if (u.error) throw u.error
+      if (d.error) throw d.error
+    } else {
+      const i = await supabase.from('materials').insert({ id, ...row, created_by: profile.id })
+      if (i.error) throw i.error
+    }
+    const c = await supabase.from('material_classes').insert(picked.map((class_id) => ({ material_id: id, class_id })))
+    if (c.error) {
+      if (!edit) await supabase.from('materials').delete().eq('id', id)
+      throw c.error
     }
   }
 
@@ -121,7 +144,7 @@ function MaterialForm({ profile, item, onDone, onCancel }) {
 
     {err && <div className="err" role="alert">{err}</div>}
     <div className="actions">
-      <button className="btn" onClick={save} disabled={busy}>{busy ? 'Menyimpan...' : edit ? 'Simpan perubahan' : 'Bagikan ke kelas'}</button>
+      <button className="btn" onClick={save} disabled={busy}>{busy ? (stage || 'Menyimpan...') : edit ? 'Simpan perubahan' : 'Bagikan ke kelas'}</button>
     </div>
   </div>)
 }
