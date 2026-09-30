@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase.js'
+import { OnlineDot, fmtWhen } from './presence.jsx'
 import { loadXlsx } from './util.js'
 
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
@@ -163,7 +164,7 @@ async function studentApi(body) {
   return j
 }
 
-function StudentRow({ s, onChange }) {
+function StudentRow({ s, onChange, on }) {
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(false)
   const [nama, setNama] = useState(s.full_name)
@@ -182,8 +183,13 @@ function StudentRow({ s, onChange }) {
   return (
     <div className="panel" style={{ opacity: s.active ? 1 : 0.6 }}>
       <div className="line" style={{ borderBottom: 0 }} onClick={() => setOpen(!open)}>
-        <div><b>{s.full_name}</b><div className="muted">{s.classes?.name} · Kode {s.code}</div></div>
+        <div><b>{s.full_name}</b><div className="muted">{s.classes?.name} · Kode {s.code}</div>
+          <div className="seen">
+            {on ? <><OnlineDot />Sedang online</> : `Terakhir masuk: ${fmtWhen(s.last_login_at)}`}
+            {!on && s.last_seen_at && ` · aktif ${fmtWhen(s.last_seen_at)}`}
+          </div></div>
         {!s.active ? <span className="badge">Nonaktif</span>
+          : on ? <span className="badge on">Online</span>
           : !s.password_changed && <span className="badge">Belum ganti password</span>}
       </div>
       {open && (<>
@@ -220,21 +226,27 @@ function printCodes(list) {
   w.document.close(); w.print()
 }
 
-export default function Students() {
+export default function Students({ online = {} }) {
   const [list, setList] = useState(null)
+  const [onlyOn, setOnlyOn] = useState(false)
   const [cls, setCls] = useState('')
   const [open, setOpen] = useState(false)
 
   async function load() {
     const { data } = await supabase.from('profiles')
-      .select('id,full_name,code,active,password_changed,classes(name)')
+      .select('id,full_name,code,active,password_changed,last_login_at,last_seen_at,classes(name)')
       .eq('role', 'student').order('full_name')
     setList(data || [])
   }
   useEffect(() => { load() }, [])
+  // Saat ada siswa masuk/keluar, segarkan riwayat login (ditunda agar tidak berat).
+  const onlineKey = Object.keys(online).sort().join(',')
+  useEffect(() => { const t = setTimeout(load, 3000); return () => clearTimeout(t) }, [onlineKey])
 
   const classes = useMemo(() => [...new Set((list || []).map((s) => s.classes?.name).filter(Boolean))].sort(), [list])
-  const shown = (list || []).filter((s) => !cls || s.classes?.name === cls)
+  const nOn = Object.keys(online).length
+  const shown = (list || []).filter((s) => (!cls || s.classes?.name === cls) && (!onlyOn || online[s.id]))
+    .sort((a, b) => (!!online[b.id] - !!online[a.id]))
 
   return (<>
     <h2>Siswa & Kelas</h2>
@@ -244,10 +256,13 @@ export default function Students() {
       <option value="">Semua kelas ({(list || []).length} siswa)</option>
       {classes.map((c) => <option key={c}>{c}</option>)}
     </select>
+    <button className={'btn ' + (onlyOn ? '' : 'ghost')} style={{ marginTop: 10 }} onClick={() => setOnlyOn(!onlyOn)}>
+      {onlyOn ? 'Tampilkan semua siswa' : `Hanya yang online (${nOn})`}
+    </button>
     {list === null && <div className="empty">Memuat...</div>}
     {list && !shown.length && <div className="empty">Belum ada siswa. Klik Impor siswa untuk memulai.</div>}
     {shown.length > 0 && <button className="link" onClick={() => printCodes(shown.filter((x) => x.active))}>Cetak daftar kode</button>}
-    {shown.map((s) => <StudentRow key={s.id} s={s} onChange={load} />)}
+    {shown.map((s) => <StudentRow key={s.id} s={s} onChange={load} on={online[s.id]} />)}
     {open && <ImportModal onClose={(changed) => { setOpen(false); if (changed) load() }} />}
   </>)
 }
