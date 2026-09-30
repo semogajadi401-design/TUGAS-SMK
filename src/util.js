@@ -13,13 +13,22 @@ export async function callApi(path, body) {
 }
 
 // Ambil semua baris (Supabase membatasi 1000 baris per permintaan).
-export async function fetchAll(make) {
-  const out = []
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await make().range(from, from + 999)
-    if (error) throw error
-    out.push(...data)
-    if (data.length < 1000) break
+// Halaman pertama diambil sendiri; jika penuh, halaman berikutnya diambil 4 sekaligus (bukan satu per satu).
+export async function fetchAll(make, par = 4) {
+  const first = await make().range(0, 999)
+  if (first.error) throw first.error
+  const out = [...first.data]
+  if (first.data.length < 1000) return out
+  for (let page = 1; ; page += par) {
+    const res = await Promise.all(Array.from({ length: par }, (_, k) =>
+      make().range((page + k) * 1000, (page + k) * 1000 + 999)))
+    let last = false
+    for (const { data, error } of res) {
+      if (error) throw error
+      out.push(...data)
+      if (data.length < 1000) last = true
+    }
+    if (last) break
   }
   return out
 }
