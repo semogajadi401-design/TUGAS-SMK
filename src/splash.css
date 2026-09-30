@@ -1,0 +1,68 @@
+/* Splash AKSARA — versi cerah */
+.sp{--ink:var(--board,#0f5c4d);--fresh:color-mix(in srgb,var(--ink) 55%,#22d3a6);--sun:#ffb703;--sky:#4cc9f0;
+  position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(165deg,#f3fff9 0%,#d9f7ec 52%,#fff3cf 100%);color:var(--ink);overflow:hidden;
+  padding:calc(var(--sat,0px) + 20px) 20px calc(var(--sab,0px) + 20px);cursor:pointer;
+  transition:opacity .6s ease,transform .7s cubic-bezier(.6,0,.2,1),filter .6s ease}
+.sp.out{opacity:0;transform:scale(1.08);filter:blur(8px);pointer-events:none}
+
+/* Latar: cahaya warna-warni lembut + titik halus */
+.sp-bg{position:absolute;inset:0;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(55px);opacity:.75;animation:sp-float 9s ease-in-out infinite alternate}
+.o1{width:52vmax;height:52vmax;left:-18vmax;top:-20vmax;background:radial-gradient(circle,rgba(34,211,166,.55),transparent 65%)}
+.o2{width:46vmax;height:46vmax;right:-16vmax;bottom:-18vmax;background:radial-gradient(circle,rgba(255,183,3,.5),transparent 65%);animation-delay:-3s}
+.o3{width:34vmax;height:34vmax;right:-8vmax;top:-8vmax;background:radial-gradient(circle,rgba(76,201,240,.45),transparent 65%);animation-delay:-6s}
+@keyframes sp-float{to{transform:translate3d(4vmax,3vmax,0) scale(1.15)}}
+.sp-grid{position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--ink) 28%,transparent) 1px,transparent 1.4px);background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(circle at 50% 48%,#000 0,transparent 68%);mask-image:radial-gradient(circle at 50% 48%,#000 0,transparent 68%);
+  opacity:0;animation:sp-fade 1.2s .1s forwards}
+
+.sp-core{position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;max-width:100%}
+.sp-hi{font-size:.78rem;font-weight:700;letter-spacing:.32em;text-transform:uppercase;color:var(--fresh);
+  opacity:0;animation:sp-fade .8s .1s forwards}
+
+/* Kata AKSARA: huruf naik satu per satu, disapu kilau kuning */
+.sp-word{margin:14px 0 0;display:flex;perspective:700px;font-weight:800;line-height:1;
+  font-size:clamp(3.2rem,17vw,7rem);letter-spacing:.02em}
+.ch{display:inline-block;padding:0 .02em;
+  background-image:linear-gradient(110deg,transparent 38%,rgba(255,235,150,1) 50%,transparent 62%),linear-gradient(180deg,var(--fresh) 0%,var(--ink) 100%);
+  background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:170% 0,0 0;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  opacity:0;transform-origin:50% 100%;filter:drop-shadow(0 6px 10px rgba(15,92,77,.18));
+  animation:sp-rise .9s calc(.35s + var(--i) * .11s) cubic-bezier(.2,.9,.25,1.1) forwards,
+            sp-sweep 1.1s calc(1.35s + var(--i) * .1s) ease-in-out forwards}
+@keyframes sp-rise{
+  from{opacity:0;transform:translateY(55%) rotateX(-80deg) scale(.7);filter:blur(16px)}
+  to{opacity:1;transform:none;filter:blur(0) drop-shadow(0 6px 10px rgba(15,92,77,.18))}}
+@keyframes sp-sweep{to{background-position:-70% 0,0 0}}
+
+/* Garis hidup di bawah kata */
+.sp-line{height:5px;width:0;margin:18px 0 0;border-radius:5px;background:linear-gradient(90deg,var(--sun),#22d3a6,var(--sky));
+  box-shadow:0 4px 16px rgba(34,211,166,.45);animation:sp-line 1s 1.2s cubic-bezier(.3,.8,.2,1) forwards}
+@keyframes sp-line{to{width:min(56%,220px)}}
+
+/* Kepanjangan: huruf depan oranye-kuning, kata muncul berurutan */
+.sp-sub{margin:20px 0 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;max-width:22em;
+  font-size:clamp(.95rem,3.6vw,1.2rem);font-weight:600;color:color-mix(in srgb,var(--ink) 82%,#000)}
+.sp-sub .w{opacity:0;transform:translateY(10px);filter:blur(6px);animation:sp-word .7s calc(1.9s + var(--d) * .26s) ease-out forwards}
+.sp-sub .w.dim{color:color-mix(in srgb,var(--ink) 55%,white)}
+.sp-sub b{color:#f28c00;font-weight:800;text-shadow:0 2px 12px rgba(255,183,3,.55)}
+@keyframes sp-word{to{opacity:1;transform:none;filter:blur(0)}}
+.sp-sub .w.dim{animation-name:sp-word-dim}
+@keyframes sp-word-dim{to{opacity:.85;transform:none;filter:blur(0)}}
+
+@keyframes sp-fade{to{opacity:1}}
+
+/* Lewati + bar kemajuan tipis */
+.sp-skip{position:absolute;top:calc(var(--sat,0px) + 14px);right:14px;width:auto;padding:8px 14px;
+  border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);border-radius:99px;background:rgba(255,255,255,.7);
+  color:var(--ink);font:600 .8rem inherit;font-family:inherit;backdrop-filter:blur(6px);
+  opacity:0;animation:sp-fade .6s 1s forwards;cursor:pointer}
+.sp-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.sp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--sun),#22d3a6,var(--sky));animation:sp-bar 4.2s linear forwards}
+@keyframes sp-bar{to{width:100%}}
+
+/* Gerak dikurangi: langsung tampil utuh */
+.sp.calm *,.sp.calm{animation-duration:.01s!important;animation-delay:0s!important}
+.sp.calm .orb{animation:none}
+@media (prefers-reduced-motion:reduce){.sp,.sp.out{transition-duration:.01s}}
