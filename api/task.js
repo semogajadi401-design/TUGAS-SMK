@@ -31,36 +31,49 @@ export default async function handler(req, res) {
       })).filter((q) => q.id && (q.text || q.image_path))
       patch.questions = newQs.length ? newQs : null
     }
-    const u = await admin.from('assignments').update(patch).eq('id', t.id)
+    // Simpan tugas dan baca daftar kelas lama BERSAMAAN, lalu ubah hanya kelas yang berbeda.
+    const [u, cur] = await Promise.all([
+      admin.from('assignments').update(patch).eq('id', t.id),
+      admin.from('assignment_classes').select('class_id').eq('assignment_id', t.id),
+    ])
     if (u.error) return fail(u.error, 'Gagal menyimpan')
-    await admin.from('assignment_classes').delete().eq('assignment_id', t.id)
-    const i = await admin.from('assignment_classes').insert(b.class_ids.map((class_id) => ({ assignment_id: t.id, class_id })))
-    if (i.error) return fail(i.error, 'Gagal menyimpan kelas')
+    if (cur.error) return fail(cur.error, 'Gagal membaca kelas')
+    const want = [...new Set(b.class_ids)]
+    const have = new Set((cur.data || []).map((x) => x.class_id))
+    const add = want.filter((c) => !have.has(c))
+    const del = [...have].filter((c) => !want.includes(c))
+    const classJobs = [
+      del.length ? admin.from('assignment_classes').delete().eq('assignment_id', t.id).in('class_id', del) : null,
+      add.length ? admin.from('assignment_classes').insert(add.map((class_id) => ({ assignment_id: t.id, class_id }))) : null,
+    ].filter(Boolean)
+    // Hapus file lama yang tidak dipakai lagi, juga bersamaan.
+    const fileJobs = []
     if (b.attachment_path && t.attachment_path && t.attachment_path !== b.attachment_path)
-      await admin.storage.from('lampiran').remove([t.attachment_path])
+      fileJobs.push(admin.storage.from('lampiran').remove([t.attachment_path]))
     if (newQs) {
-      // Hapus gambar soal lama yang sudah tidak dipakai.
       const keep = new Set(newQs.map((q) => q.image_path).filter(Boolean))
       const gone = (t.questions || []).map((q) => q.image_path).filter((p) => p && !keep.has(p))
-      if (gone.length) await admin.storage.from('lampiran').remove(gone)
+      if (gone.length) fileJobs.push(admin.storage.from('lampiran').remove(gone))
     }
+    const [classRes] = await Promise.all([Promise.all(classJobs), Promise.all(fileJobs)])
+    const ce = classRes.find((r) => r?.error)
+    if (ce) return fail(ce.error, 'Gagal menyimpan kelas')
     return res.json({ ok: true })
   }
 
   if (b.action === 'delete') {
     const { data: subs } = await admin.from('submissions').select('id').eq('assignment_id', t.id)
     const ids = (subs || []).map((s) => s.id)
-    const paths = []
-    for (const part of chunk(ids)) {
-      const { data } = await admin.from('submission_photos').select('path').in('submission_id', part)
-      paths.push(...(data || []).map((p) => p.path))
-    }
-    for (const part of chunk([...new Set(paths)])) await admin.storage.from('jawaban').remove(part)
-    for (const part of chunk(ids)) await admin.from('submission_photos').delete().in('submission_id', part)
+    const rs = await Promise.all(chunk(ids).map((part) => admin.from('submission_photos').select('path').in('submission_id', part)))
+    const paths = rs.flatMap((r) => (r.data || []).map((p) => p.path))
+    await Promise.all(chunk([...new Set(paths)]).map((part) => admin.storage.from('jawaban').remove(part)))
+    await Promise.all(chunk(ids).map((part) => admin.from('submission_photos').delete().in('submission_id', part)))
     await admin.from('submissions').delete().eq('assignment_id', t.id)
-    await admin.from('task_group_members').delete().eq('assignment_id', t.id)
-    await admin.from('task_groups').delete().eq('assignment_id', t.id)
-    await admin.from('assignment_classes').delete().eq('assignment_id', t.id)
+    await Promise.all([
+      admin.from('task_group_members').delete().eq('assignment_id', t.id),
+      admin.from('task_groups').delete().eq('assignment_id', t.id),
+      admin.from('assignment_classes').delete().eq('assignment_id', t.id),
+    ])
     const d = await admin.from('assignments').delete().eq('id', t.id)
     if (d.error) return fail(d.error, 'Gagal menghapus')
     const files = [t.attachment_path, ...(t.questions || []).map((q) => q.image_path)].filter(Boolean)
