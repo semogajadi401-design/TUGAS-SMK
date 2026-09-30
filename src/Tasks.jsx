@@ -54,28 +54,31 @@ function TaskForm({ profile, task, onDone, onCancel }) {
     if (!f.subject) return setErr('Pilih mata pelajaran.')
     if (!picked.length) return setErr('Pilih minimal satu kelas tujuan.')
     setBusy(true); setErr('')
+    const uploaded = []
     try {
       const id = edit ? task.id : crypto.randomUUID()
-      let attachment_path = null
-      if (file) {
+      // Lampiran dan semua gambar soal dikompres + diunggah BERSAMAAN (bukan satu per satu).
+      const upAttach = file ? (async () => {
         const path = `${id}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`
         const up = await supabase.storage.from('lampiran').upload(path, file)
         if (up.error) throw up.error
-        attachment_path = path
-      }
-      const questions = []
-      for (const q of qs) {
-        const text = q.text.trim()
-        if (!text && !q.file && !q.image_path) continue
-        let image_path = q.image_path || null
-        if (q.file) {
-          const blob = await compress(q.file, 1600, 0.8)
-          image_path = `${id}/q-${q.id}-${Date.now()}.jpg`
-          const up = await supabase.storage.from('lampiran').upload(image_path, blob, { contentType: 'image/jpeg' })
-          if (up.error) throw up.error
-        }
-        questions.push({ id: q.id, text, image_path })
-      }
+        uploaded.push(path)
+        return path
+      })() : Promise.resolve(null)
+      const upQuestions = qs
+        .filter((q) => q.text.trim() || q.file || q.image_path)
+        .map(async (q) => {
+          let image_path = q.image_path || null
+          if (q.file) {
+            const blob = await compress(q.file, 1600, 0.8)
+            image_path = `${id}/q-${q.id}-${Date.now()}.jpg`
+            const up = await supabase.storage.from('lampiran').upload(image_path, blob, { contentType: 'image/jpeg' })
+            if (up.error) throw up.error
+            uploaded.push(image_path)
+          }
+          return { id: q.id, text: q.text.trim(), image_path }
+        })
+      const [attachment_path, questions] = await Promise.all([upAttach, Promise.all(upQuestions)])
       const due_at = f.due ? new Date(f.due).toISOString() : null
       if (edit) {
         await callApi('/api/task', { action: 'update', id, title: f.title, instructions: f.instructions, due_at,
@@ -92,7 +95,10 @@ function TaskForm({ profile, task, onDone, onCancel }) {
         .insert(picked.map((class_id) => ({ assignment_id: id, class_id })))).error
       if (e2) { await supabase.from('assignments').delete().eq('id', id); throw e2 }
       onDone(group ? id : null)
-    } catch (x) { setErr('Gagal menyimpan: ' + x.message) }
+    } catch (x) {
+      if (uploaded.length) await supabase.storage.from('lampiran').remove(uploaded).catch(() => {})
+      setErr('Gagal menyimpan: ' + x.message)
+    }
     setBusy(false)
   }
 
