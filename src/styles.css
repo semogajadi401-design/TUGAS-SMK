@@ -560,3 +560,18 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .hero.hero-quiz small,.hero.hero-quiz p{color:rgba(255,255,255,.9)}
 @media (min-width:700px){.gcards{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){.gcard{transition:none}}
+/* ---- Penilaian: tambahan (tempel di PALING BAWAH src/styles.css) ---- */
+.chip.miss{background:#eceef0;color:#5b6470}
+.meter.slim{height:8px;margin-top:8px}
+.taskcard.static{cursor:default}
+.taskcard.static:hover{border-color:var(--line)}
+.gsum{margin-bottom:14px}
+.gsum-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.gsum-stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.seg button .cnt{display:inline-block;min-width:1.4em;margin-left:2px;padding:1px 6px;border-radius:99px;
+  background:rgba(0,0,0,.08);font-size:.75rem;font-weight:700}
+.seg button.on .cnt{background:var(--board);color:#fff}
+.seg button{font-size:.82rem;padding:9px 4px}
+.gnav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 14px}
+.gnav .btn{flex:0 0 auto;padding:8px 12px;font-size:.88rem;margin:0;width:auto}
+.gnav .btn:disabled{opacity:.4}
