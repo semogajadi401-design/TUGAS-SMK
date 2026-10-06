@@ -560,6 +560,7 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .hero.hero-quiz small,.hero.hero-quiz p{color:rgba(255,255,255,.9)}
 @media (min-width:700px){.gcards{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){.gcard{transition:none}}
+
 /* ---- Penilaian: tambahan (tempel di PALING BAWAH src/styles.css) ---- */
 .chip.miss{background:#eceef0;color:#5b6470}
 .meter.slim{height:8px;margin-top:8px}
@@ -575,3 +576,7 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .gnav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 14px}
 .gnav .btn{flex:0 0 auto;padding:8px 12px;font-size:.88rem;margin:0;width:auto}
 .gnav .btn:disabled{opacity:.4}
+
+/* ---- Status "Dikembalikan" ---- */
+.chip.back{background:#ffe3cc;color:#8a3b00}
+.bnote{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-style:italic}
