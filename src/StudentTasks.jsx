@@ -131,6 +131,7 @@ function Detail({ id, profile, onBack }) {
   }
 
   async function save(submit) {
+    if (busy) return
     setBusy(true); setMsg(null)
     try {
       if (submit && hasQ) {
@@ -141,9 +142,10 @@ function Detail({ id, profile, onBack }) {
         if (task.answer_type === 'text' && !text.trim()) throw new Error('Isi jawaban teks sebelum mengirim.')
         if (task.answer_type === 'both' && !total && !text.trim()) throw new Error('Tambahkan foto atau jawaban teks sebelum mengirim.')
       }
-      const status = submit ? 'submitted' : (sub?.status || 'draft')
+      // 1) Simpan dulu sebagai draf. Status "submitted" baru dipasang di langkah 3,
+      //    setelah semua foto benar-benar terunggah. Jika unggah gagal, tugas tidak terkunci kosong.
       const { data: row, error } = await supabase.from('submissions')
-        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, answers: hasQ ? answers : null, status, ...(submit && sub?.return_note ? { return_note: null } : {}) },
+        .upsert({ assignment_id: id, student_id: profile.id, text_answer: text, answers: hasQ ? answers : null, status: sub?.status || 'draft' },
           { onConflict: 'assignment_id,student_id' }).select('id').single()
       if (error) throw error
       if (removed.length) {
@@ -156,12 +158,27 @@ function Detail({ id, profile, onBack }) {
         const blob = await compress(a.file)
         const path = `${profile.id}/${row.id}/${stamp}-${i}.jpg`
         const up = await supabase.storage.from('jawaban').upload(path, blob, { contentType: 'image/jpeg' })
-        if (up.error) throw up.error
+        if (up.error) throw new Error('Foto gagal diunggah. Periksa koneksi internet lalu coba lagi. Jawabanmu belum terkirim.')
         return path
       }))
       if (paths.length) {
         const ins = await supabase.from('submission_photos').insert(paths.map((path, i) => ({ submission_id: row.id, path, question_id: added[i].q })))
         if (ins.error) throw ins.error
+      }
+      // 2) Saat mengirim: cek ulang isi yang TERSIMPAN di server, bukan hanya isi layar.
+      // 3) Baru kunci (status submitted).
+      if (submit) {
+        const { data: saved, error: e2 } = await supabase.from('submission_photos').select('question_id').eq('submission_id', row.id)
+        if (e2) throw e2
+        const fotoDi = (q) => (saved || []).filter((p) => (p.question_id || null) === q).length
+        const terisi = (txt, n) => task.answer_type === 'photo' ? n > 0 : task.answer_type === 'text' ? !!txt.trim() : n > 0 || !!txt.trim()
+        const kosong = hasQ
+          ? questions.findIndex((q) => !terisi(answers[q.id] || '', fotoDi(q.id)))
+          : (terisi(text, (saved || []).length) ? -1 : 0)
+        if (kosong >= 0) throw new Error(hasQ ? `Soal nomor ${kosong + 1} belum tersimpan di server. Coba kirim lagi.` : 'Jawabanmu belum tersimpan lengkap. Coba kirim lagi.')
+        const fin = await supabase.from('submissions')
+          .update({ status: 'submitted', ...(sub?.return_note ? { return_note: null } : {}) }).eq('id', row.id)
+        if (fin.error) throw fin.error
       }
       if (submit && task.is_group && grp?.isLeader) {
         try { await callApi('/api/group', { action: 'sync', assignment_id: id }) }
