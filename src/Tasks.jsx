@@ -14,7 +14,7 @@ function stateOf(sub, due) {
   if (sub.score != null) return { k: 'graded', t: 'Dinilai ' + sub.score }
   if (sub.status === 'submitted')
     return { k: 'sent', t: due && new Date(sub.submitted_at) > new Date(due) ? 'Dikirim terlambat' : 'Dikirim' }
-  if (sub.return_note) return { k: 'draft', t: 'Diminta perbaikan' }
+  if (sub.return_note) return { k: 'back', t: 'Dikembalikan' }
   return { k: 'draft', t: 'Draf' }
 }
 
