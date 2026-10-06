@@ -208,6 +208,7 @@ function GradeOne({ task, sub, ids, label, members, pos, total, onSave, onReturn
 function ByTask({ task, onBack }) {
   const [subs, setSubs] = useState(null)
   const [studs, setStuds] = useState([])
+  const [back, setBack] = useState({})
   const [f, setF] = useState('wait')
   const [cls, setCls] = useState('')
   const [idx, setIdx] = useState(null)
@@ -218,7 +219,7 @@ function ByTask({ task, onBack }) {
   const cids = (task.assignment_classes || []).map((x) => x.class_id)
 
   async function load(first) {
-    const [sb, st] = await Promise.all([
+    const [sb, st, ot] = await Promise.all([
       supabase.from('submissions')
         .select('id,student_id,text_answer,answers,status,submitted_at,score,feedback,photos_cleaned,profiles(full_name,classes(name))')
         .eq('assignment_id', task.id).eq('status', 'submitted'),
@@ -226,7 +227,12 @@ function ByTask({ task, onBack }) {
         ? fetchAll(() => supabase.from('profiles').select('id,full_name,class_id,classes(name)')
           .eq('role', 'student').eq('active', true).in('class_id', cids).order('id'))
         : Promise.resolve([]),
+      supabase.from('submissions').select('student_id,return_note')
+        .eq('assignment_id', task.id).neq('status', 'submitted'),
     ])
+    const bk = {}
+    for (const x of ot.data || []) if (x.return_note) bk[x.student_id] = x.return_note
+    setBack(bk)
     const list = (sb.data || []).sort((a, b) =>
       (a.profiles?.classes?.name || '').localeCompare(b.profiles?.classes?.name || '') ||
       (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || ''))
@@ -256,6 +262,7 @@ function ByTask({ task, onBack }) {
   const missing = studs.filter((st) => !hasSent(st))
     .sort((a, b) => (a.classes?.name || '').localeCompare(b.classes?.name || '') || (a.full_name || '').localeCompare(b.full_name || ''))
 
+  const nBack = missing.filter((st) => back[st.id]).length
   const reps = subs.filter(rep)
   const nWait = reps.filter((s) => s.score == null).length
   const nDone = reps.length - nWait
@@ -278,7 +285,7 @@ function ByTask({ task, onBack }) {
       pos={idx} total={queue.length}
       onClose={() => setIdx(null)}
       onPrev={() => setIdx(idx - 1)} onNext={() => setIdx(idx + 1)}
-      onReturned={(list) => { setSubs(subs.filter((s) => !list.includes(s.id))); setIdx(null); setNote('Jawaban dikembalikan ke siswa untuk diperbaiki.') }}
+      onReturned={(list) => { setSubs(subs.filter((s) => !list.includes(s.id))); setIdx(null); setNote('Jawaban dikembalikan ke siswa. Statusnya sekarang "Dikembalikan" di tab Belum kirim.'); load() }}
       onSave={(upd, goNext, list) => {
         setSubs(subs.map((s) => (list.includes(s.id) ? { ...s, score: upd.score, feedback: upd.feedback } : s)))
         if (goNext && idx + 1 < queue.length) setIdx(idx + 1)
@@ -305,7 +312,7 @@ function ByTask({ task, onBack }) {
     const XLSX = await loadXlsx()
     const ws = XLSX.utils.aoa_to_sheet([['Nama', 'Kelas', 'Status', 'Dikirim', 'Nilai', 'Komentar'],
       ...subs.map((s) => [s.profiles?.full_name, s.profiles?.classes?.name || '', 'Sudah kirim', when(s.submitted_at), s.score ?? '', s.feedback || '']),
-      ...missing.map((s) => [s.full_name, s.classes?.name || '', 'Belum kirim', '', '', ''])])
+      ...missing.map((s) => [s.full_name, s.classes?.name || '', back[s.id] ? 'Dikembalikan' : 'Belum kirim', '', '', back[s.id] || ''])])
     ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 8 }, { wch: 40 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Nilai')
@@ -313,7 +320,7 @@ function ByTask({ task, onBack }) {
   }
 
   async function copyMissing() {
-    const names = shownMissing.map((s) => s.full_name)
+    const names = shownMissing.map((s) => s.full_name + (back[s.id] ? ' (dikembalikan)' : ''))
     if (!names.length) return
     const title = `Belum mengumpulkan "${task.title}"${cls ? ` (${cls})` : ''}:`
     const ok = await copyText(listText(title, names))
@@ -335,7 +342,8 @@ function ByTask({ task, onBack }) {
       <div className="gsum-stats">
         <span className="chip soon">{nWait} belum dinilai</span>
         <span className="chip graded">{nDone} sudah dinilai</span>
-        <span className="chip miss">{missing.length} belum kirim</span>
+        <span className="chip miss">{missing.length - nBack} belum kirim</span>
+        {nBack > 0 && <span className="chip back">{nBack} dikembalikan</span>}
       </div>
     </div>
 
@@ -374,8 +382,12 @@ function ByTask({ task, onBack }) {
       )}
       {shownMissing.map((s) => (
         <div className="taskcard static" key={s.id}>
-          <div><b>{s.full_name}</b><div className="muted">{s.classes?.name}</div></div>
-          <span className="chip miss">Belum kirim</span>
+          <div style={{ minWidth: 0 }}>
+            <b>{s.full_name}</b>
+            <div className="muted">{s.classes?.name}</div>
+            {back[s.id] && <div className="muted bnote">Alasan: {back[s.id]}</div>}
+          </div>
+          <span className={'chip ' + (back[s.id] ? 'back' : 'miss')}>{back[s.id] ? 'Dikembalikan' : 'Belum kirim'}</span>
         </div>
       ))}
     </>)}
