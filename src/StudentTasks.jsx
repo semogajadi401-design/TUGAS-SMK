@@ -3,18 +3,8 @@ import { supabase } from './supabase.js'
 import { callApi, compress } from './util.js'
 import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 import { Icon, I } from './Shell.jsx'
+import { dueInfo, fmtFull, isClosed, relative } from './deadline.js'
 
-const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
-function dueInfo(due) {
-  if (!due) return { t: 'Tanpa tenggat', c: '' }
-  if (new Date(due) < new Date()) return { t: 'Terlambat', c: 'late' }
-  const n = Math.round((dayStart(due) - dayStart(new Date())) / 864e5)
-  if (n === 0) return { t: 'Hari ini', c: 'soon' }
-  if (n === 1) return { t: 'Besok', c: 'soon' }
-  return { t: `${n} hari lagi`, c: '' }
-}
-const fmt = (d) => new Date(d).toLocaleString('id-ID',
-  { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
 const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x?.return_note ? 'revise' : x ? 'draft' : 'todo')
 const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
 const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto dan teks' }
@@ -28,13 +18,15 @@ function List({ onOpen }) {
 
   useEffect(() => {
     (async () => {
-      const [a, s] = await Promise.all([
+      const [a, s, e] = await Promise.all([
         supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active')
           .order('due_at', { ascending: true, nullsFirst: false }),
         supabase.from('submissions').select('assignment_id,status,score,return_note'),
+        supabase.from('task_extensions').select('assignment_id,due_at'), // perpanjangan dari guru
       ])
       const m = new Map((s.data || []).map((x) => [x.assignment_id, x]))
-      setRows((a.data || []).map((t) => ({ ...t, st: stateOf(m.get(t.id)) })))
+      const ext = new Map((e.data || []).map((x) => [x.assignment_id, x.due_at]))
+      setRows((a.data || []).map((t) => ({ ...t, due: ext.get(t.id) || t.due_at, extended: ext.has(t.id), st: stateOf(m.get(t.id)) })))
     })()
   }, [])
 
@@ -56,11 +48,18 @@ function List({ onOpen }) {
     {rows === null && <div className="empty">Memuat...</div>}
     {rows && !shown.length && <div className="empty">Tidak ada tugas di kategori ini.</div>}
     {shown.map((t) => {
-      const di = dueInfo(t.due_at)
+      const di = dueInfo(t.due)
+      const pending = t.st === 'todo' || t.st === 'draft' || t.st === 'revise'
       return (
         <button className="task" key={t.id} onClick={() => onOpen(t.id)}>
-          <div><b>{t.title}</b><div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}</div></div>
-          {t.st === 'todo' || t.st === 'draft' || t.st === 'revise'
+          <div>
+            <b>{t.title}</b>
+            <div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}</div>
+            {pending && t.due && (
+              <div className="muted">{di.closed ? 'Berakhir ' : 'Batas '}{fmtFull(t.due)}{t.extended && !di.closed ? ' (diperpanjang)' : ''}</div>
+            )}
+          </div>
+          {pending
             ? <span className={'chip ' + di.c}>{di.t}</span>
             : <span className={'chip ' + (t.st === 'graded' ? 'graded' : 'sent')}>{LABEL[t.st]}</span>}
         </button>
@@ -82,12 +81,15 @@ function Detail({ id, profile, onBack }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const [grp, setGrp] = useState(undefined)
+  const [ext, setExt] = useState(null) // perpanjangan dari guru (jika ada)
 
   async function load() {
-    const [t, s] = await Promise.all([
+    const [t, s, e] = await Promise.all([
       supabase.from('assignments').select('*').eq('id', id).single(),
       supabase.from('submissions').select('*, submission_photos(id,path,question_id)').eq('assignment_id', id).maybeSingle(),
+      supabase.from('task_extensions').select('due_at').eq('assignment_id', id).eq('student_id', profile.id).maybeSingle(),
     ])
+    setExt(e.data?.due_at || null)
     setTask(t.data); setSub(s.data); setText(s.data?.text_answer || ''); setAnswers(s.data?.answers || {})
     if (t.data?.is_group) callApi('/api/group', { action: 'mine', assignment_id: id }).then(setGrp).catch(() => setGrp({ group: null, isLeader: false }))
     else setGrp(null)
@@ -109,7 +111,9 @@ function Detail({ id, profile, onBack }) {
   const graded = sub?.score != null
   const viewer = !!task.is_group && !grp?.isLeader
   const sent = sub?.status === 'submitted'
-  const locked = viewer || graded || sent // setelah dikirim ke guru, jawaban tidak bisa diubah lagi
+  const due = ext || task.due_at                 // tenggat efektif (perpanjangan guru jika ada)
+  const closed = isClosed(due) && !graded && !sent // waktu habis sebelum dikirim
+  const locked = viewer || graded || sent || closed // setelah dikirim atau waktu habis, jawaban tidak bisa diubah
   const wantsPhoto = task.answer_type !== 'text' && !viewer
   const wantsText = task.answer_type !== 'photo'
   const questions = task.questions || []
@@ -121,7 +125,7 @@ function Detail({ id, profile, onBack }) {
     const t = (answers[q] || '').trim(), n = countOf(q)
     return task.answer_type === 'photo' ? n > 0 : task.answer_type === 'text' ? !!t : n > 0 || !!t
   }
-  const di = dueInfo(task.due_at)
+  const di = dueInfo(due)
 
   function pick(e, q = null) {
     const room = q ? MAX_PER_Q - countOf(q) : MAX_PHOTOS - total
@@ -134,6 +138,7 @@ function Detail({ id, profile, onBack }) {
     if (busy) return
     setBusy(true); setMsg(null)
     try {
+      if (isClosed(due)) throw new Error('Waktu pengerjaan sudah berakhir, jadi jawaban tidak bisa disimpan atau dikirim lagi. Hubungi gurumu jika perlu tambahan waktu.')
       if (submit && hasQ) {
         const i = questions.findIndex((q) => !answered(q.id))
         if (i >= 0) throw new Error(`Soal nomor ${i + 1} belum dijawab.`)
@@ -231,7 +236,13 @@ function Detail({ id, profile, onBack }) {
       <span className={'chip ' + di.c}>{di.t}</span>
       <span className="chip">{TYPE[task.answer_type]}</span>
     </div>
-    {task.due_at && <p className="muted">Tenggat: {fmt(task.due_at)}</p>}
+    {due && (
+      <p className={'muted dueline' + (closed ? ' over' : '')}>
+        {closed ? 'Waktu pengerjaan berakhir ' : 'Batas pengumpulan: '}<b>{fmtFull(due)}</b>
+        {!closed && !graded && !sent ? ` (${relative(due)})` : ''}
+        {ext && !closed ? ' · diperpanjang oleh guru' : ''}
+      </p>
+    )}
     {task.instructions && <p className="instr">{task.instructions}</p>}
     {attach && <a className="btn ghost attach" href={attach} target="_blank" rel="noreferrer">Buka lampiran dari guru</a>}
 
@@ -251,7 +262,13 @@ function Detail({ id, profile, onBack }) {
         <div><b>Nilai kamu</b>{sub.feedback && <p>{sub.feedback}</p>}</div>
       </div>
     )}
-    {locked && !graded && <div className="banner">{sent ? 'Tugas sudah dikirim ke guru, jadi tidak bisa diubah lagi. Menunggu dinilai.' : 'Tenggat sudah lewat, jawabanmu terkunci dan menunggu dinilai.'}</div>}
+    {sent && !graded && <div className="banner">Tugas sudah dikirim ke guru, jadi tidak bisa diubah lagi. Menunggu dinilai.</div>}
+    {closed && !viewer && (
+      <div className="banner">
+        Waktu pengerjaan sudah berakhir, jadi kamu tidak bisa mengerjakan atau mengirim tugas ini lagi.
+        {sub?.return_note ? ' Guru sempat memintamu memperbaikinya, tapi waktunya sudah habis.' : ''} Hubungi gurumu jika perlu tambahan waktu.
+      </div>
+    )}
 
     {hasQ ? questions.map((q, i) => (
       <div className="qcard" key={q.id}>
