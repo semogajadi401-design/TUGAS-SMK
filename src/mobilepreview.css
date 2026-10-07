@@ -1,0 +1,17 @@
+.mp-btn{position:fixed;left:20px;bottom:20px;z-index:10000;display:flex;align-items:center;gap:8px;
+  padding:11px 18px;border:0;border-radius:999px;background:#0f5c4d;color:#fff;font:inherit;font-weight:700;
+  font-size:.9rem;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.28)}
+.mp-btn:hover{background:#0b4a3e}
+.mp-btn:focus-visible,.mp-close:focus-visible,.mp-device:focus-visible{outline:3px solid #fbbf24;outline-offset:2px}
+.mp-overlay{position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;background:#111827}
+.mp-bar{display:flex;align-items:center;gap:10px}
+.mp-close,.mp-device{padding:9px 14px;border:0;border-radius:8px;background:#f3f4f6;color:#111;font:inherit;
+  font-weight:600;font-size:.85rem;cursor:pointer}
+.mp-close:hover{background:#fff}
+.mp-size{color:#9ca3af;font-size:.8rem}
+.mp-phone{position:relative;box-sizing:content-box;border:12px solid #000;border-radius:44px;background:#fff;
+  overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6);transform-origin:center center;flex:none}
+.mp-phone::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:22px;
+  background:#000;border-radius:0 0 14px 14px;z-index:2;pointer-events:none}
+.mp-frame{display:block;width:100%;height:100%;border:0;background:#fff}

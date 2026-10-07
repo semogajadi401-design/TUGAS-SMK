@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import Splash from './Splash.jsx'
 import UpdateNotice from './UpdateNotice.jsx'
+import MobilePreview from './MobilePreview.jsx'
 import './styles.css'
-createRoot(document.getElementById('root')).render(<><App /><Splash /><UpdateNotice /></>)
+createRoot(document.getElementById('root')).render(<><App /><Splash /><UpdateNotice /><MobilePreview /></>)
 
 // Jeda animasi latar saat tab tidak terlihat.
 document.addEventListener('visibilitychange', () =>
