@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { supabase, toEmail } from './supabase.js'
+import { toEmail, signIn, isAuthDown } from './supabase.js'
+import { reportNetFailure, useOnline } from './lib/net.js'
+import { offlineLogin, stageLogin, OFFLINE_LOGIN_DAYS } from './lib/offline.js'
 import { Brand } from './brand.jsx'
 import { Art } from './Backdrop.jsx'
 
@@ -36,7 +38,18 @@ const Spark = () => (
   </svg>
 )
 
-export default function Login({ s }) {
+// Pesan saat masuk tanpa internet.
+const OFF_MSG = {
+  teacher: () => 'Guru perlu terhubung ke internet untuk masuk.',
+  none: () => 'Tidak ada koneksi internet. Sambungkan internet untuk masuk. Masuk tanpa internet hanya bisa untuk siswa yang pernah masuk di perangkat ini.',
+  wrong: (r) => `Password tidak cocok dengan yang tersimpan di perangkat (sisa percobaan: ${r.left}). Jika passwordmu baru direset guru, sambungkan internet untuk masuk.`,
+  locked: (r) => `Terlalu banyak percobaan salah. Coba lagi dalam ${r.wait} menit.`,
+  expired: () => `Data masuk offline sudah kedaluwarsa (lebih dari ${OFFLINE_LOGIN_DAYS} hari). Sambungkan internet untuk masuk.`,
+  inactive: () => 'Akun ini tidak aktif. Hubungi gurumu.',
+}
+
+export default function Login({ s, onOffline }) {
+  const online = useOnline()
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [show, setShow] = useState(false)
@@ -60,15 +73,26 @@ export default function Login({ s }) {
     return () => clearInterval(t)
   }, [m])
 
+  // Masuk tanpa server: cocokkan password dengan data yang tersimpan di perangkat (khusus siswa).
+  async function offlineAttempt(email) {
+    if (id.includes('@')) return setErr(OFF_MSG.teacher())
+    const r = await offlineLogin(email, pw)
+    if (r.ok) return onOffline?.(r.profile, email, pw, r.uid)
+    setErr(OFF_MSG[r.reason](r))
+  }
+
   async function submit(e) {
     e.preventDefault()
     setBusy(true); setErr('')
     const email = toEmail(id)
-    let { error } = await supabase.auth.signInWithPassword({ email, password: pw })
-    if (error && pw !== pw.toUpperCase())
-      ({ error } = await supabase.auth.signInWithPassword({ email, password: pw.toUpperCase() }))
-    if (error) setErr('Kode atau password salah. Periksa lagi, atau minta guru mereset passwordmu.')
-    setBusy(false)
+    try {
+      if (navigator.onLine === false) return await offlineAttempt(email)
+      const { error, password } = await signIn(email, pw)
+      if (!error) { stageLogin(email, password); return }
+      // Gangguan jaringan/server BUKAN password salah: coba masuk offline.
+      if (isAuthDown(error)) { reportNetFailure(); return await offlineAttempt(email) }
+      setErr('Kode atau password salah. Periksa lagi, atau minta guru mereset passwordmu.')
+    } finally { setBusy(false) }
   }
 
   return (
@@ -119,6 +143,7 @@ export default function Login({ s }) {
         {err && <div className="err" role="alert">{err}</div>}
         <button className="btn big" disabled={busy}>{busy ? 'Memeriksa...' : 'Masuk'}</button>
         <p className="hint">Pertama kali masuk? Password awalmu sama dengan kodemu.</p>
+        {!online && <p className="hint">Tidak ada internet. Siswa yang pernah masuk di perangkat ini tetap bisa masuk.</p>}
       </form>
       <footer className="credit">
         <p>Developed By <b>@Tasrif</b></p>

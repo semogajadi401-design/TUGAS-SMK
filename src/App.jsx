@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { supabase } from './supabase.js'
+import { supabase, toEmail, signIn, isAuthDown } from './supabase.js'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
 import Home from './Home.jsx'
@@ -11,7 +11,10 @@ import Welcome, { hasSeenWelcome, markWelcomeSeen } from './Welcome.jsx'
 import PushCard from './PushCard.jsx'
 import { useOnline } from './lib/net.js'
 import { toast } from './lib/toast.js'
-import { listPending, saveLastProfile, loadLastProfile, wipeCaches } from './lib/offline.js'
+import {
+  listPending, saveLastProfile, loadLastProfile, wipeCaches,
+  commitLogin, forgetOfflineLogin, saveOfflineLogin, dropStagedLogin, KEEP_OFFLINE_ON_LOGOUT,
+} from './lib/offline.js'
 import { syncPush, detachPush } from './lib/push.js'
 
 // Id pengguna dari sesi yang tersimpan di perangkat. Kosong bila sudah keluar dari akun.
@@ -71,7 +74,7 @@ class Boundary extends Component {
   }
 }
 
-function ChangePassword({ onDone, code }) {
+function ChangePassword({ onDone, code, profile }) {
   const [pw, setPw] = useState('')
   const [msg, setMsg] = useState({ t: '', ok: false })
   const [busy, setBusy] = useState(false)
@@ -85,6 +88,7 @@ function ChangePassword({ onDone, code }) {
     if (error) setMsg({ t: 'Gagal mengganti password: ' + error.message, ok: false })
     else {
       await supabase.rpc('mark_password_changed')
+      if (code && profile) saveOfflineLogin(toEmail(code), pw, profile) // supaya masuk offline memakai password baru
       setPw(''); setMsg({ t: 'Password berhasil diganti.', ok: true }); onDone?.()
     }
     setBusy(false)
@@ -99,6 +103,13 @@ function ChangePassword({ onDone, code }) {
       <button className="btn" disabled={busy}>Ubah password</button>
     </form>
   )
+}
+
+// Keluar akun yang tetap berhasil saat offline atau server lambat (sama seperti menu logo di Shell).
+async function logout() {
+  try { await supabase.auth.signOut() } catch { /* lanjut ke cara lokal */ }
+  try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* abaikan */ }
+  window.location.reload()
 }
 
 const Soon = ({ text }) => <div className="empty">{text}</div>
@@ -209,9 +220,9 @@ function Student({ profile, reload, s }) {
         </dl>
         <PushCard />
         <h2>Ubah password</h2>
-        <ChangePassword onDone={reload} code={profile.code} />
+        <ChangePassword onDone={reload} code={profile.code} profile={profile} />
         <button className="btn ghost" style={{ marginTop: 16 }}
-          onClick={() => window.confirm('Keluar dari akun ini?') && supabase.auth.signOut()}>Keluar dari akun</button>
+          onClick={() => window.confirm('Keluar dari akun ini?') && logout()}>Keluar dari akun</button>
       </>)}
       </Suspense></Boundary>
     </Shell>
@@ -254,6 +265,15 @@ export default function App() {
   const [s, setS] = useState(DEFAULTS)
   const [offlineMode, setOfflineMode] = useState(false)
   const online = useOnline()
+  // Password siswa yang masuk secara offline. Hanya di memori (hilang saat halaman ditutup) dan dipakai
+  // untuk masuk otomatis ke server begitu internet kembali, supaya jawaban offline bisa terkirim.
+  const offlineCred = useRef(null)
+
+  // Siswa masuk lewat password yang dicocokkan di perangkat (Login.jsx -> offlineLogin).
+  function enterOffline(p, email, pw, uid) {
+    offlineCred.current = { email, pw, uid }
+    setProfile(p); setState('in'); setOfflineMode(true)
+  }
 
   // Sesi masih tersimpan tapi tidak bisa diperbarui karena offline: buka aplikasi dengan profil terakhir
   // (hanya siswa). Setelah keluar dari akun, sesi terhapus sehingga jalur ini tidak bisa dipakai.
@@ -283,7 +303,10 @@ export default function App() {
       })
       .catch(async () => { if (!off && !(await tryOffline())) setState('error') })
     const { data: sub } = supabase.auth.onAuthStateChange((e, x) => {
-      if (e === 'SIGNED_OUT') { detachPush(); wipeCaches() } // jawaban yang belum terkirim tetap disimpan
+      if (e === 'SIGNED_OUT') {
+        detachPush(); dropStagedLogin(); offlineCred.current = null
+        if (!KEEP_OFFLINE_ON_LOGOUT) wipeCaches() // jawaban yang belum terkirim tetap disimpan
+      }
       setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x))
     })
     return () => { off = true; sub.subscription.unsubscribe() }
@@ -297,10 +320,12 @@ export default function App() {
       // Gangguan jaringan/server BUKAN alasan untuk mengeluarkan pengguna.
       if (error) throw error
       if (!data || !data.active) {
+        forgetOfflineLogin(x.user.id)
         await supabase.auth.signOut(); setProfile(null); setState('out'); return
       }
       try { sessionStorage.removeItem('chunk-retry') } catch { /* abaikan */ }
       saveLastProfile(data)
+      commitLogin(data) // simpan/perbarui data masuk offline (khusus siswa)
       setProfile(data); setState('in'); setOfflineMode(false)
     } catch {
       if (!(await tryOffline())) setState('error')
@@ -314,11 +339,29 @@ export default function App() {
     [session === undefined, session?.user?.id])
 
   // Internet kembali saat aplikasi dibuka dalam mode offline: pulihkan sesi dan muat ulang profil.
+  // Bila masuk lewat password offline (belum ada sesi), masuk ke server otomatis dengan password tadi.
   useEffect(() => {
     if (!offlineMode || !online) return
-    supabase.auth.getSession()
-      .then(({ data }) => { if (data.session) { setSession(data.session); loadProfile(data.session) } })
-      .catch(() => {})
+    let off = false
+    ;(async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (off) return
+        if (data.session) { setSession(data.session); loadProfile(data.session); return }
+        const c = offlineCred.current
+        if (!c) return
+        const { error } = await signIn(c.email, c.pw)
+        if (off) return
+        if (!error) { offlineCred.current = null; return } // onAuthStateChange memuat ulang profil
+        if (isAuthDown(error)) return // masih gangguan jaringan: tetap offline, coba lagi nanti
+        // Password di server sudah berbeda (mis. direset guru): data masuk offline tidak berlaku lagi.
+        offlineCred.current = null
+        forgetOfflineLogin(c.uid)
+        setOfflineMode(false); setProfile(null); setState('out')
+        toast({ kind: 'warn', ms: 8000, text: 'Passwordmu sudah berubah. Masuk lagi dengan password yang baru.' })
+      } catch { /* abaikan, dicoba lagi saat status online berubah */ }
+    })()
+    return () => { off = true }
   }, [offlineMode, online])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
@@ -328,7 +371,7 @@ export default function App() {
       <button className="btn" onClick={() => location.reload()}>Coba lagi</button>
     </div>
   )
-  if (state === 'out') return <Login s={s} />
+  if (state === 'out') return <Login s={s} onOffline={enterOffline} />
   return profile.role === 'teacher'
     ? <Teacher profile={profile} s={s} onSaved={setS} />
     : <Student profile={profile} s={s} reload={() => loadProfile()} />
