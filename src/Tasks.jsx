@@ -4,7 +4,12 @@ import { callApi, fetchAll, copyText, listText, toLocalInput, compress } from '.
 import GroupEditor from './GroupEditor.jsx'
 import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 
-const TYPES = { photo: 'Foto', text: 'Teks', both: 'Foto dan teks' }
+const TYPES = { photo: 'Foto saja', text: 'Teks saja', both: 'Foto atau teks' }
+const TYPE_HELP = {
+  photo: 'Siswa wajib mengirim foto jawaban.',
+  text: 'Siswa wajib mengetik jawaban di layar.',
+  both: 'Siswa bebas memilih: kirim foto, ketik di layar, atau keduanya. Cukup salah satu terisi agar bisa dikirim.',
+}
 const fmt = (d) => d
   ? new Date(d).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   : 'Tanpa tenggat'
@@ -143,6 +148,7 @@ function TaskForm({ profile, task, onDone, onCancel }) {
           <button key={k} type="button" className={f.type === k ? 'on' : ''} onClick={() => setF({ ...f, type: k })}>{l}</button>
         ))}
       </div>
+      <p className="muted">{TYPE_HELP[f.type]} Untuk tugas bersoal, aturan ini berlaku di setiap soal.</p>
       {!edit ? (<>
         <h3>Cara mengerjakan</h3>
         <div className="seg">
