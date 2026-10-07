@@ -101,14 +101,16 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
             const line = !t.due ? '' : closedNow ? `Berakhir ${fmtFull(t.due)}` : `${t.revise ? 'Perbaiki sebelum' : 'Batas'} ${fmtFull(t.due)}`
             return (
               <div className={'item row ' + di.c} key={t.id}>
-                <button className="item-t item-link" onClick={() => onOpen?.(t.id)}>
+                <div className="item-t item-link">
                   <b>{t.title}</b>
                   {t.subjects?.name && <small>{t.subjects.name}</small>}
                   {line && <small>{line}{t.extended && !closedNow ? ' (diperpanjang)' : ''}</small>}
-                </button>
+                </div>
                 <div className="item-side">
                   <span className={'chip ' + di.c}>{di.t}</span>
-                  {!closedNow && (
+                  {closedNow ? (
+                    <button className="lite-btn" onClick={() => onOpen?.(t.id)}>Lihat detail</button>
+                  ) : (
                     <button className={'btn3d' + (t.revise ? ' fix' : '')} onClick={() => onOpen?.(t.id)}>
                       <span>{t.revise ? 'Perbaiki Sekarang' : 'Kerjakan Sekarang'}</span>
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
