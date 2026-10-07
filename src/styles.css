@@ -190,6 +190,16 @@ textarea:focus{border-color:var(--board);outline:none}
   color:var(--danger);font-size:.88rem;font-weight:700;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}
 
+/* ---- Logo di header: klik untuk menampilkan tombol keluar ---- */
+.logo-wrap{position:relative;flex:none}
+.logo-btn{display:block;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;line-height:0}
+.logo-btn:focus-visible{outline:2px solid var(--board);outline-offset:2px}
+.logo-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:30;min-width:140px;background:#fff;
+  border:1px solid var(--line,#e4e7ec);border-radius:14px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.logo-out{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:10px 12px;
+  border-radius:10px;font:inherit;font-size:.92rem;font-weight:700;color:var(--danger);cursor:pointer;text-align:left}
+.logo-out:hover,.logo-out:active{background:color-mix(in srgb,var(--danger) 10%,white)}
+
 /* ---- Pengerjaan tugas (siswa) ---- */
 .task{width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit}
 .tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
