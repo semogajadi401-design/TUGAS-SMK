@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import { callApi, fetchAll, loadXlsx, copyText, listText } from './util.js'
+import { callApi, fetchAll, loadXlsx, copyText, listText, toLocalInput } from './util.js'
+import { fmtFull, isClosed, relative, plusDays } from './deadline.js'
 import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 
 const QUICK = [50, 60, 70, 80, 90, 100]
@@ -78,8 +79,41 @@ function TaskList({ onOpen }) {
   </>)
 }
 
+/* ---------- Panel perpanjangan waktu ---------- */
+function ExtendPanel({ task, studentIds, title, onDone, onCancel }) {
+  const [v, setV] = useState(() => toLocalInput(plusDays(2)))
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function save() {
+    const d = new Date(v)
+    if (!v || isNaN(d) || d <= new Date()) return setErr('Pilih waktu di masa depan.')
+    setBusy(true); setErr('')
+    try {
+      await callApi('/api/extend', { action: 'set', assignment_id: task.id, student_ids: studentIds, due_at: d.toISOString() })
+      onDone(d.toISOString())
+    } catch (e) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <div className="panel extpanel">
+      <h3>{title}</h3>
+      <p className="muted">Siswa bisa mengerjakan dan mengirim lagi sampai waktu yang Anda pilih. Setelah itu otomatis ditutup lagi.</p>
+      <div className="checks">
+        {[1, 3, 7].map((n) => <button key={n} type="button" onClick={() => setV(toLocalInput(plusDays(n)))}>+{n} hari</button>)}
+      </div>
+      <label htmlFor="extv">Diperpanjang sampai</label>
+      <input id="extv" type="datetime-local" value={v} onChange={(e) => setV(e.target.value)} />
+      {v && !isNaN(new Date(v)) && <p className="muted" style={{ marginTop: -8 }}>{fmtFull(v)}</p>}
+      {err && <div className="err">{err}</div>}
+      <div className="picks">
+        <button className="btn" disabled={busy} onClick={save}>{busy ? 'Menyimpan...' : 'Simpan perpanjangan'}</button>
+        <button className="btn ghost" disabled={busy} onClick={onCancel}>Batal</button>
+      </div>
+    </div>
+  )
+}
+
 /* ---------- Menilai satu siswa ---------- */
-function GradeOne({ task, sub, ids, label, members, pos, total, onSave, onReturned, onPrev, onNext, onClose }) {
+function GradeOne({ task, sub, ids, studentIds, dueNow, label, members, pos, total, onSave, onReturned, onPrev, onNext, onClose }) {
   const [photos, setPhotos] = useState([])
   const [score, setScore] = useState(sub.score ?? '')
   const [fb, setFb] = useState(sub.feedback || '')
@@ -87,9 +121,11 @@ function GradeOne({ task, sub, ids, label, members, pos, total, onSave, onReturn
   const qurls = useQuestionUrls(task.questions)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [back, setBack] = useState(false)
+  const [until, setUntil] = useState('')
 
   useEffect(() => {
-    setScore(sub.score ?? ''); setFb(sub.feedback || ''); setErr(''); setPhotos([])
+    setScore(sub.score ?? ''); setFb(sub.feedback || ''); setErr(''); setPhotos([]); setBack(false)
     ;(async () => {
       const { data: l } = await supabase.from('submission_photos').select('id,path,question_id').eq('submission_id', sub.id)
       if (l?.length) {
@@ -110,11 +146,25 @@ function GradeOne({ task, sub, ids, label, members, pos, total, onSave, onReturn
     onSave({ ...sub, score: n, feedback }, goNext, ids || [sub.id])
   }
 
-  async function sendBack() {
+  const needExt = isClosed(dueNow) // tenggat sudah lewat: siswa terkunci kecuali diperpanjang
+
+  function askBack() {
     if (!fb.trim()) return setErr('Tulis alasan perbaikan di kolom komentar dulu.')
-    if (!window.confirm('Kembalikan jawaban ini ke siswa untuk diperbaiki? Nilainya (jika ada) dikosongkan.')) return
+    setErr(''); setUntil(needExt ? toLocalInput(plusDays(2)) : ''); setBack(true)
+  }
+
+  async function sendBack() {
+    let iso = null
+    if (until) {
+      const d = new Date(until)
+      if (isNaN(d) || d <= new Date()) return setErr('Batas waktu perbaikan harus di masa depan.')
+      iso = d.toISOString()
+    } else if (needExt) return setErr('Tenggat sudah lewat. Isi batas waktu perbaikan supaya siswa bisa mengerjakan lagi.')
     setBusy(true); setErr('')
     const list = ids || [sub.id]
+    try {
+      if (iso) await callApi('/api/extend', { action: 'set', assignment_id: task.id, student_ids: studentIds, due_at: iso })
+    } catch (e) { setBusy(false); return setErr('Gagal memberi perpanjangan: ' + e.message) }
     const { error } = await supabase.from('submissions')
       .update({ status: 'draft', return_note: fb.trim(), score: null, feedback: null }).in('id', list)
     setBusy(false)
@@ -194,7 +244,24 @@ function GradeOne({ task, sub, ids, label, members, pos, total, onSave, onReturn
       {busy ? 'Menyimpan...' : isLast ? 'Simpan & selesai' : 'Simpan & berikutnya'}
     </button>
     <button className="btn ghost" style={{ marginTop: 10 }} disabled={busy} onClick={() => save(false)}>Simpan, tetap di sini</button>
-    <button className="link" disabled={busy} onClick={sendBack}>Minta siswa memperbaiki (kembalikan jawaban)</button>
+    {!back && <button className="link" disabled={busy} onClick={askBack}>Minta siswa memperbaiki (kembalikan jawaban)</button>}
+    {back && (
+      <div className="panel extpanel">
+        <h3>Kembalikan ke siswa</h3>
+        <p className="muted">Siswa akan melihat komentar di atas dan bisa memperbaiki jawabannya.{dueNow && !needExt ? ` Tanpa batas baru, mereka memakai tenggat semula: ${fmtFull(dueNow)}.` : ''}</p>
+        {needExt && <div className="banner">Tenggat sudah lewat ({fmtFull(dueNow)}), jadi siswa terkunci. Beri batas waktu perbaikan agar mereka bisa mengerjakan lagi.</div>}
+        <label htmlFor="bk">Batas waktu perbaikan {needExt ? '(wajib)' : '(opsional)'}</label>
+        <input id="bk" type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} />
+        <div className="checks">
+          {[1, 3, 7].map((n) => <button key={n} type="button" onClick={() => setUntil(toLocalInput(plusDays(n)))}>+{n} hari</button>)}
+        </div>
+        {until && !isNaN(new Date(until)) && <p className="muted" style={{ marginTop: -4 }}>{fmtFull(until)}</p>}
+        <div className="picks">
+          <button className="btn" disabled={busy} onClick={sendBack}>{busy ? 'Mengembalikan...' : 'Kembalikan sekarang'}</button>
+          <button className="btn ghost" disabled={busy} onClick={() => { setBack(false); setErr('') }}>Batal</button>
+        </div>
+      </div>
+    )}
     {zoom && (
       <div className="lightbox" onClick={() => setZoom('')}>
         <img src={zoom} alt="Foto diperbesar" />
@@ -209,6 +276,8 @@ function ByTask({ task, onBack }) {
   const [subs, setSubs] = useState(null)
   const [studs, setStuds] = useState([])
   const [back, setBack] = useState({})
+  const [ext, setExt] = useState({})
+  const [panel, setPanel] = useState(null) // { ids, title } untuk perpanjangan dari tab Belum kirim
   const [f, setF] = useState('wait')
   const [cls, setCls] = useState('')
   const [idx, setIdx] = useState(null)
@@ -219,7 +288,7 @@ function ByTask({ task, onBack }) {
   const cids = (task.assignment_classes || []).map((x) => x.class_id)
 
   async function load(first) {
-    const [sb, st, ot] = await Promise.all([
+    const [sb, st, ot, ex] = await Promise.all([
       supabase.from('submissions')
         .select('id,student_id,text_answer,answers,status,submitted_at,score,feedback,photos_cleaned,profiles(full_name,classes(name))')
         .eq('assignment_id', task.id).eq('status', 'submitted'),
@@ -229,7 +298,9 @@ function ByTask({ task, onBack }) {
         : Promise.resolve([]),
       supabase.from('submissions').select('student_id,return_note')
         .eq('assignment_id', task.id).neq('status', 'submitted'),
+      supabase.from('task_extensions').select('student_id,due_at').eq('assignment_id', task.id),
     ])
+    setExt(Object.fromEntries((ex.data || []).map((x) => [x.student_id, x.due_at])))
     const bk = {}
     for (const x of ot.data || []) if (x.return_note) bk[x.student_id] = x.return_note
     setBack(bk)
@@ -253,6 +324,7 @@ function ByTask({ task, onBack }) {
   const idsOf = (s) => g[s.student_id] && task.is_group
     ? subs.filter((x) => g[s.student_id].members.includes(x.student_id)).map((x) => x.id) : [s.id]
   const nameOf = (s) => (task.is_group && g[s.student_id] ? g[s.student_id].name : s.profiles?.full_name)
+  const studentIdsOf = (s) => (task.is_group && g[s.student_id] ? g[s.student_id].members : [s.student_id])
   const membersOf = (s) => task.is_group && g[s.student_id]
     ? subs.filter((x) => g[s.student_id].members.includes(x.student_id)).map((x) => x.profiles?.full_name).filter(Boolean) : []
 
@@ -280,6 +352,7 @@ function ByTask({ task, onBack }) {
   if (idx !== null) {
     const cur = byId.get(queue[idx])
     return <GradeOne key={cur.id} task={task} sub={cur} ids={idsOf(cur)}
+      studentIds={studentIdsOf(cur)} dueNow={ext[cur.student_id] || task.due_at}
       label={task.is_group && g[cur.student_id] ? nameOf(cur) : undefined}
       members={membersOf(cur)}
       pos={idx} total={queue.length}
@@ -339,6 +412,13 @@ function ByTask({ task, onBack }) {
         {totalUnits ? <span className="muted">{pct}%</span> : null}
       </div>
       {totalUnits ? <div className="meter slim"><i style={{ width: pct + '%' }} /></div> : null}
+      {task.due_at && (
+        <p className="muted" style={{ margin: '10px 0 0' }}>
+          Tenggat: <b>{fmtFull(task.due_at)}</b> · {isClosed(task.due_at)
+            ? 'sudah berakhir. Siswa tidak bisa mengerjakan lagi kecuali Anda beri perpanjangan.'
+            : relative(task.due_at)}
+        </p>
+      )}
       <div className="gsum-stats">
         <span className="chip soon">{nWait} belum dinilai</span>
         <span className="chip graded">{nDone} sudah dinilai</span>
@@ -377,8 +457,16 @@ function ByTask({ task, onBack }) {
 
     {f === 'miss' && (<>
       {!shownMissing.length && <div className="empty">Semua siswa sudah mengirim.</div>}
+      {panel && (
+        <ExtendPanel task={task} studentIds={panel.ids} title={panel.title}
+          onCancel={() => setPanel(null)}
+          onDone={(iso) => { setPanel(null); setNote(`Waktu ${panel.ids.length} siswa diperpanjang sampai ${fmtFull(iso)}.`); load() }} />
+      )}
       {shownMissing.length > 0 && (
-        <button className="btn ghost" style={{ marginBottom: 12 }} onClick={copyMissing}>Salin nama yang belum mengumpulkan</button>
+        <div className="picks" style={{ marginBottom: 12 }}>
+          <button className="btn ghost" onClick={copyMissing}>Salin nama</button>
+          <button className="btn ghost" onClick={() => setPanel({ ids: shownMissing.map((s) => s.id), title: `Perpanjang waktu untuk ${shownMissing.length} siswa` })}>Perpanjang semua</button>
+        </div>
       )}
       {shownMissing.map((s) => (
         <div className="taskcard static" key={s.id}>
@@ -386,8 +474,12 @@ function ByTask({ task, onBack }) {
             <b>{s.full_name}</b>
             <div className="muted">{s.classes?.name}</div>
             {back[s.id] && <div className="muted bnote">Alasan: {back[s.id]}</div>}
+            {ext[s.id] && <div className="muted">Diperpanjang sampai {fmtFull(ext[s.id])}{isClosed(ext[s.id]) ? ' (sudah berakhir)' : ''}</div>}
           </div>
-          <span className={'chip ' + (back[s.id] ? 'back' : 'miss')}>{back[s.id] ? 'Dikembalikan' : 'Belum kirim'}</span>
+          <div className="rowact">
+            <span className={'chip ' + (back[s.id] ? 'back' : 'miss')}>{back[s.id] ? 'Dikembalikan' : 'Belum kirim'}</span>
+            <button className="link" style={{ marginTop: 0 }} onClick={() => { setPanel({ ids: [s.id], title: `Perpanjang waktu: ${s.full_name}` }); window.scrollTo?.({ top: 0, behavior: 'smooth' }) }}>Perpanjang</button>
+          </div>
         </div>
       ))}
     </>)}
