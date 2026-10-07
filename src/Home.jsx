@@ -1,15 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-
-const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
-function dueInfo(due) {
-  if (!due) return { t: 'Tanpa tenggat', c: '' }
-  if (new Date(due) < new Date()) return { t: 'Terlambat', c: 'late' }
-  const n = Math.round((dayStart(due) - dayStart(new Date())) / 864e5)
-  if (n === 0) return { t: 'Hari ini', c: 'soon' }
-  if (n === 1) return { t: 'Besok', c: 'soon' }
-  return { t: `${n} hari lagi`, c: '' }
-}
+import { dueInfo, fmtFull, isClosed, relative } from './deadline.js'
 
 const TIP_KEY = 'tip-password-hidden'
 const readTip = () => { try { return localStorage.getItem(TIP_KEY) === '1' } catch { return false } }
@@ -22,15 +13,17 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
 
   useEffect(() => {
     (async () => {
-      const [a, s] = await Promise.all([
+      const [a, s, e] = await Promise.all([
         supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active'),
         supabase.from('submissions').select('assignment_id,status,score,updated_at,return_note'),
+        supabase.from('task_extensions').select('assignment_id,due_at'), // perpanjangan dari guru
       ])
+      const ext = new Map((e.data || []).map((x) => [x.assignment_id, x.due_at]))
       const sub = new Map((s.data || []).map((x) => [x.assignment_id, x]))
       setRows((a.data || []).map((t) => {
         const x = sub.get(t.id)
         const state = x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : 'todo'
-        return { ...t, state, score: x?.score, at: x?.updated_at, revise: state === 'todo' && !!x?.return_note }
+        return { ...t, due: ext.get(t.id) || t.due_at, extended: ext.has(t.id), state, score: x?.score, at: x?.updated_at, revise: state === 'todo' && !!x?.return_note }
       }))
     })()
   }, [])
@@ -45,7 +38,22 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
     if (rows === null) return <div className="empty">Memuat...</div>
     const total = rows.length
     const done = rows.filter((r) => r.state !== 'todo').length
-    const todo = rows.filter((r) => r.state === 'todo').sort((a, b) => (a.due_at || '9') < (b.due_at || '9') ? -1 : 1)
+    const byDue = (a, b) => (a.due || '9') < (b.due || '9') ? -1 : 1
+    const pending = rows.filter((r) => r.state === 'todo')
+    const open = pending.filter((r) => !isClosed(r.due)).sort(byDue)       // masih bisa dikerjakan
+    const closed = pending.filter((r) => isClosed(r.due)).sort(byDue)      // tenggat lewat, terkunci
+    const todo = [...open, ...closed]
+    const back = open.filter((r) => r.revise)
+    const fresh = open.filter((r) => !r.revise)
+    const nearest = open.find((r) => r.due)
+    let main = 'Belum ada tugas'
+    if (total) {
+      if (!todo.length) main = 'Semua tugas sudah terkirim'
+      else if (back.length && fresh.length) main = `${back.length} tugas perlu diperbaiki dan ${fresh.length} perlu dikerjakan`
+      else if (back.length) main = `${back.length} tugas dikembalikan guru untuk diperbaiki`
+      else if (fresh.length) main = `${fresh.length} tugas perlu dikerjakan`
+      else main = `Waktu mengerjakan ${closed.length} tugas sudah berakhir`
+    }
     const waiting = rows.filter((r) => r.state === 'sent').length
     const graded = rows.filter((r) => r.state === 'graded')
     const avg = graded.length ? Math.round(graded.reduce((n, r) => n + Number(r.score), 0) / graded.length) : null
@@ -55,7 +63,7 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
     return (<>
       <section className="sum" aria-label="Ringkasan tugas">
         <p className="sum-main">
-          {!total ? 'Belum ada tugas' : todo.length ? `${todo.length} tugas perlu dikerjakan` : 'Semua tugas sudah terkirim'}
+          {main}
         </p>
         {total > 0 && (<>
           <div className="track" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
@@ -63,6 +71,17 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
           </div>
           <p className="sum-cap">{done} dari {total} tugas selesai</p>
         </>)}
+        {nearest && (
+          <p className="sum-due">
+            {nearest.revise ? 'Perbaiki' : 'Kerjakan'} <b>{nearest.title}</b> sebelum <b>{fmtFull(nearest.due)}</b> ({relative(nearest.due)}){nearest.extended ? ' · diperpanjang guru' : ''}.
+          </p>
+        )}
+        {closed.length > 0 && (
+          <p className="sum-due">
+            {open.length ? `${closed.length} tugas lain sudah ditutup karena tenggat lewat. ` : 'Kamu tidak bisa mengerjakannya lagi. '}
+            Hubungi gurumu jika perlu tambahan waktu.
+          </p>
+        )}
         {(waiting > 0 || avg !== null) && (
           <dl className="facts">
             {waiting > 0 && <div><dt>Menunggu nilai</dt><dd>{waiting}</dd></div>}
@@ -77,12 +96,15 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
       ) : (
         <div className="list">
           {todo.slice(0, SHOW).map((t) => {
-            const di = t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due_at)
+            const closedNow = isClosed(t.due)
+            const di = closedNow ? dueInfo(t.due) : t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due)
+            const line = !t.due ? '' : closedNow ? `Berakhir ${fmtFull(t.due)}` : `${t.revise ? 'Perbaiki sebelum' : 'Batas'} ${fmtFull(t.due)}`
             return (
               <button className={'item ' + di.c} key={t.id} onClick={() => onOpen?.(t.id)}>
                 <span className="item-t">
                   <b>{t.title}</b>
                   {t.subjects?.name && <small>{t.subjects.name}</small>}
+                  {line && <small>{line}{t.extended && !closedNow ? ' (diperpanjang)' : ''}</small>}
                 </span>
                 <span className={'chip ' + di.c}>{di.t}</span>
               </button>
