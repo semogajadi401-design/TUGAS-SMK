@@ -32,14 +32,23 @@ const show = (n) => (n > 99 ? '99+' : n)
 
 export default function Shell({ s, profile, role, items, tab, setTab, children }) {
   const [open, setOpen] = useState(false)
+  const [logoMenu, setLogoMenu] = useState(false)
   const [fx, setFx] = useState(() => { try { return localStorage.getItem('bgfx') === '1' } catch { return false } })
   const flipFx = () => setFx((v) => { try { localStorage.setItem('bgfx', v ? '0' : '1') } catch { /* diabaikan */ } return !v })
 
   useEffect(() => {
-    const k = (e) => e.key === 'Escape' && setOpen(false)
+    const k = (e) => { if (e.key === 'Escape') { setOpen(false); setLogoMenu(false) } }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [])
+
+  // Menu logo: tutup bila klik di luar menu.
+  useEffect(() => {
+    if (!logoMenu) return
+    const c = (e) => { if (!e.target.closest?.('.logo-wrap')) setLogoMenu(false) }
+    document.addEventListener('pointerdown', c)
+    return () => document.removeEventListener('pointerdown', c)
+  }, [logoMenu])
 
   const cur = items.find((i) => i.k === tab)
   const total = items.reduce((a, i) => a + (i.badge || 0), 0)
@@ -57,7 +66,19 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
         <div className="ttl"><small>{s.school_name}</small><strong>{cur?.label}</strong></div>
         <button className={'menu-btn fx-btn' + (fx ? ' on' : '')} aria-pressed={fx} onClick={flipFx}
           aria-label="Latar transparan" title="Latar transparan"><Icon d={I.layers} /></button>
-        <Brand s={s} size={38} />
+        <div className="logo-wrap">
+          <button className="logo-btn" aria-label="Menu akun" aria-haspopup="menu" aria-expanded={logoMenu}
+            onClick={() => setLogoMenu((v) => !v)}>
+            <Brand s={s} size={38} />
+          </button>
+          {logoMenu && (
+            <div className="logo-menu" role="menu">
+              <button role="menuitem" className="logo-out" onClick={() => { setLogoMenu(false); out() }}>
+                <Icon d={I.logout} size={18} />Keluar
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="page">{children}</main>
