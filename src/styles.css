@@ -593,3 +593,41 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 .rowact{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto}
 .extpanel{margin:12px 0}
 .extpanel .picks .btn{flex:1}
+
+/* ---- Tombol 3D "Kerjakan Sekarang" di daftar tugas Beranda ---- */
+.item.row{cursor:default}
+.item-link{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;text-align:left;background:none;border:0;
+  padding:0;margin:0;color:inherit;font:inherit;cursor:pointer}
+.item-side{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex:0 0 auto}
+.btn3d{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  width:auto;margin:0;padding:11px 18px 11px 20px;border:0;border-radius:14px;cursor:pointer;
+  font:inherit;font-weight:800;font-size:.95rem;letter-spacing:.01em;color:#fff;white-space:nowrap;
+  text-shadow:0 1px 0 rgba(0,0,0,.25);
+  background:linear-gradient(180deg,#5b8cff 0%,#2f64f0 45%,#1d4ed8 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 6px 0 #17358f,0 12px 18px rgba(23,53,143,.35);
+  transform:translateY(0);transition:transform .12s ease,box-shadow .12s ease,filter .12s ease}
+.btn3d::before{content:"";position:absolute;left:8px;right:8px;top:3px;height:45%;border-radius:10px 10px 40px 40px;
+  background:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0));pointer-events:none}
+.btn3d svg{transition:transform .15s ease;flex:0 0 auto}
+.btn3d:hover{transform:translateY(-2px);filter:brightness(1.06);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 8px 0 #17358f,0 16px 22px rgba(23,53,143,.38)}
+.btn3d:hover svg{transform:translateX(3px)}
+.btn3d:active{transform:translateY(6px);filter:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 0 0 #17358f,0 3px 6px rgba(23,53,143,.3)}
+.btn3d:focus-visible{outline:3px solid #fbbf24;outline-offset:3px}
+.btn3d.fix{background:linear-gradient(180deg,#ff7a7a 0%,#ef4444 45%,#dc2626 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 6px 0 #8f1d1d,0 12px 18px rgba(143,29,29,.32)}
+.btn3d.fix:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 8px 0 #8f1d1d,0 16px 22px rgba(143,29,29,.36)}
+.btn3d.fix:active{box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(0,0,0,.12),
+    0 0 0 #8f1d1d,0 3px 6px rgba(143,29,29,.3)}
+@media (max-width:560px){
+  .item.row{flex-wrap:wrap}
+  .item-side{width:100%;flex-direction:row-reverse;justify-content:space-between;align-items:center;padding-bottom:6px}
+  .btn3d{flex:1;margin-right:12px}
+}
+@media (prefers-reduced-motion:reduce){.btn3d,.btn3d svg{transition:none}}
