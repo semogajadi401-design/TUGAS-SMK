@@ -3,7 +3,7 @@ import { supabase } from './supabase.js'
 import { callApi } from './util.js'
 
 const KINDS = ['tasks', 'materials', 'grades']
-const ZERO = { tasks: 0, materials: 0, grades: 0, quiz: 0 }
+const ZERO = { tasks: 0, materials: 0, grades: 0, quiz: 0, announce: 0 }
 const POLL_MS = 120000
 
 // Menghitung tugas, materi, dan nilai yang belum dilihat siswa.
@@ -39,7 +39,7 @@ export function useNotifs() {
     const started = Date.now()
     const m = await loadMarks()
     if (!m || !alive.current) return
-    const [t, mine, mt, g, qn] = await Promise.all([
+    const [t, mine, mt, g, qn, an] = await Promise.all([
       // Tanpa limit: daftar difilter di sisi klien agar tugas yang sudah dikerjakan tidak ikut terhitung.
       supabase.from('assignments').select('id,title').eq('status', 'active')
         .gt('created_at', m.tasks).order('created_at', { ascending: false }),
@@ -49,23 +49,25 @@ export function useNotifs() {
       supabase.from('submissions').select('id,assignments(title)', { count: 'exact' })
         .not('score', 'is', null).gt('graded_at', m.grades).order('graded_at', { ascending: false }).limit(3),
       callApi('/api/quiz', { action: 'news' }).catch(() => ({ count: 0, titles: [] })),
+      callApi('/api/announce', { action: 'news' }).catch(() => ({ count: 0, items: [] })),
     ])
     if (!alive.current) return
     // Tugas yang sudah pernah dikerjakan/dikirim/dinilai bukan lagi "tugas baru".
     const done = new Set((mine.data || []).map((x) => x.assignment_id))
     const newTasks = (t.data || []).filter((x) => !done.has(x.id))
-    const c = { tasks: newTasks.length, materials: mt.count ?? 0, grades: g.count ?? 0, quiz: qn.count ?? 0 }
+    const c = { tasks: newTasks.length, materials: mt.count ?? 0, grades: g.count ?? 0, quiz: qn.count ?? 0, announce: an.count ?? 0 }
     // Hasil pengecekan ini bisa sudah basi kalau siswa membuka menunya selagi pengecekan berjalan.
     for (const k of Object.keys(c)) if ((cleared.current[k] || 0) >= started) c[k] = 0
     setCounts(c)
     if (first.current) {
       first.current = false
-      if (c.tasks + c.materials + c.grades + c.quiz > 0) {
+      if (c.tasks + c.materials + c.grades + c.quiz + c.announce > 0) {
         setPopup({
           tasks: { n: c.tasks, titles: newTasks.slice(0, 3).map((x) => x.title) },
           materials: { n: c.materials, titles: (mt.data || []).map((x) => x.title) },
           grades: { n: c.grades, titles: (g.data || []).map((x) => x.assignments?.title).filter(Boolean) },
           quiz: { n: c.quiz, titles: qn.titles || [] },
+          announce: { n: c.announce, titles: (an.items || []).map((x) => x.title) },
         })
       }
     }
@@ -83,6 +85,7 @@ export function useNotifs() {
   async function markSeen(kind) {
     cleared.current[kind] = Date.now()
     setCounts((c) => (c[kind] ? { ...c, [kind]: 0 } : c))
+    if (kind === 'announce') { try { await callApi('/api/announce', { action: 'seen' }) } catch { /* dicoba lagi saat menu dibuka */ } return }
     // Simpan lewat server; kalau gagal, coba fungsi lama di database.
     try { await callApi('/api/quiz', { action: 'seen', kind }) }
     catch { if (kind !== 'quiz') await supabase.rpc('mark_seen', { p_kind: kind }) }
@@ -92,6 +95,7 @@ export function useNotifs() {
 }
 
 const ROWS = [
+  ['announce', 'pengumuman baru dari guru', 'Baca pengumuman'],
   ['grades', 'nilai baru', 'Lihat nilai'],
   ['quiz', 'quiz baru', 'Lihat quiz'],
   ['tasks', 'tugas baru', 'Lihat tugas'],

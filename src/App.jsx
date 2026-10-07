@@ -27,7 +27,7 @@ function storedUserId() {
   } catch { /* abaikan */ }
   return null
 }
-const TABS_FROM_LINK = ['tasks', 'materials', 'quiz', 'grades']
+const TABS_FROM_LINK = ['tasks', 'materials', 'quiz', 'grades', 'announce']
 
 // Jika file tab gagal diunduh (biasanya karena baru ada versi baru), muat ulang halaman satu kali.
 const lazyRetry = (load) => lazy(() => load().catch((e) => {
@@ -52,6 +52,8 @@ const Recap = lazyRetry(() => import('./Recap.jsx'))
 const Materials = lazyRetry(() => import('./Materials.jsx'))
 const StudentMaterials = lazyRetry(() => import('./StudentMaterials.jsx'))
 const Quiz = lazyRetry(() => import('./Quiz.jsx'))
+const Announcements = lazyRetry(() => import('./Announcements.jsx'))
+const StudentAnnouncements = lazyRetry(() => import('./StudentAnnouncements.jsx'))
 const StudentQuiz = lazyRetry(() => import('./StudentQuiz.jsx'))
 const Wait = <div className="empty">Memuat...</div>
 
@@ -185,6 +187,7 @@ function Student({ profile, reload, s }) {
   useEffect(() => { if (online && ['tasks', 'materials', 'grades', 'quiz'].includes(tab)) nt.markSeen(tab) }, [tab, online])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
+    { k: 'announce', label: 'Pengumuman', icon: I.announce, badge: nt.counts.announce },
     { k: 'tasks', label: 'Tugas', icon: I.tasks, badge: nt.counts.tasks },
     { k: 'materials', label: 'Materi', icon: I.book, badge: nt.counts.materials },
     { k: 'quiz', label: 'Quiz', icon: I.quiz, badge: nt.counts.quiz },
@@ -206,6 +209,7 @@ function Student({ profile, reload, s }) {
       )}
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
       {!needsNet && tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {!needsNet && tab === 'announce' && <StudentAnnouncements onSeen={() => nt.markSeen('announce')} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
       {!needsNet && tab === 'materials' && <StudentMaterials />}
       {!needsNet && tab === 'quiz' && <StudentQuiz />}
@@ -237,6 +241,7 @@ function Teacher({ profile, s, onSaved }) {
     { k: 'tasks', label: 'Tugas', icon: I.tasks },
     { k: 'materials', label: 'Materi', icon: I.book },
     { k: 'quiz', label: 'Quiz', icon: I.quiz },
+    { k: 'announce', label: 'Pengumuman', icon: I.announce },
     { k: 'grading', label: 'Penilaian', icon: I.check },
     { k: 'recap', label: 'Rekap Nilai', icon: I.table },
     { k: 'students', label: 'Siswa & Kelas', icon: I.users },
@@ -249,6 +254,7 @@ function Teacher({ profile, s, onSaved }) {
       {tab === 'tasks' && <Tasks profile={profile} />}
       {tab === 'materials' && <Materials profile={profile} />}
       {tab === 'quiz' && <Quiz />}
+      {tab === 'announce' && <Announcements />}
       {tab === 'grading' && <Grading />}
       {tab === 'recap' && <Recap />}
       {tab === 'students' && <Students online={online} />}
