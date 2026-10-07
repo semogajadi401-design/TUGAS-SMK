@@ -33,11 +33,13 @@ const show = (n) => (n > 99 ? '99+' : n)
 export default function Shell({ s, profile, role, items, tab, setTab, children }) {
   const [open, setOpen] = useState(false)
   const [logoMenu, setLogoMenu] = useState(false)
+  const [confirmOut, setConfirmOut] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const [fx, setFx] = useState(() => { try { return localStorage.getItem('bgfx') === '1' } catch { return false } })
   const flipFx = () => setFx((v) => { try { localStorage.setItem('bgfx', v ? '0' : '1') } catch { /* diabaikan */ } return !v })
 
   useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape') { setOpen(false); setLogoMenu(false) } }
+    const k = (e) => { if (e.key === 'Escape') { setOpen(false); setLogoMenu(false); setConfirmOut(false) } }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [])
@@ -45,7 +47,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
   // Menu logo: tutup bila klik di luar menu.
   useEffect(() => {
     if (!logoMenu) return
-    const c = (e) => { if (!e.target.closest?.('.logo-wrap')) setLogoMenu(false) }
+    const c = (e) => { if (!e.target.closest?.('.logo-wrap')) { setLogoMenu(false); setConfirmOut(false) } }
     document.addEventListener('pointerdown', c)
     return () => document.removeEventListener('pointerdown', c)
   }, [logoMenu])
@@ -54,6 +56,13 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
   const total = items.reduce((a, i) => a + (i.badge || 0), 0)
   const go = (k) => { setTab(k); setOpen(false) }
   const out = () => { if (window.confirm('Keluar dari akun ini?')) supabase.auth.signOut() }
+  // Keluar lewat menu logo: tanpa window.confirm, dan dipastikan selesai walau server lambat/gagal.
+  const leave = async () => {
+    setLeaving(true)
+    try { await supabase.auth.signOut() } catch { /* lanjut ke cara lokal */ }
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* abaikan */ }
+    window.location.reload()
+  }
 
   return (
     <div className={'shell' + (fx ? ' fx-on' : '')}>
@@ -68,14 +77,24 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
           aria-label="Latar transparan" title="Latar transparan"><Icon d={I.layers} /></button>
         <div className="logo-wrap">
           <button className="logo-btn" aria-label="Menu akun" aria-haspopup="menu" aria-expanded={logoMenu}
-            onClick={() => setLogoMenu((v) => !v)}>
+            onClick={() => { setLogoMenu((v) => !v); setConfirmOut(false) }}>
             <Brand s={s} size={38} />
           </button>
           {logoMenu && (
             <div className="logo-menu" role="menu">
-              <button role="menuitem" className="logo-out" onClick={() => { setLogoMenu(false); out() }}>
-                <Icon d={I.logout} size={18} />Keluar
-              </button>
+              {!confirmOut ? (
+                <button role="menuitem" className="logo-out" onClick={() => setConfirmOut(true)}>
+                  <Icon d={I.logout} size={18} />Keluar
+                </button>
+              ) : (
+                <div className="logo-ask">
+                  <span>Keluar dari akun ini?</span>
+                  <div className="logo-ask-btns">
+                    <button className="logo-yes" disabled={leaving} onClick={leave}>{leaving ? 'Keluar...' : 'Ya, keluar'}</button>
+                    <button className="logo-no" disabled={leaving} onClick={() => setConfirmOut(false)}>Batal</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
