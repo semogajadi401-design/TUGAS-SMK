@@ -91,7 +91,7 @@ export default function Shell({ s, profile, role, items, tab, setTab, children }
                   <span>Keluar dari akun ini?</span>
                   <div className="logo-ask-btns">
                     <button className="logo-yes" disabled={leaving} onClick={leave}>{leaving ? 'Keluar...' : 'Ya, keluar'}</button>
-                    <button className="logo-no" disabled={leaving} onClick={() => setConfirmOut(false)}>Batal</button>
+                    <button className="logo-no" disabled={leaving} onClick={() => { setLogoMenu(false); setConfirmOut(false) }}>Batal</button>
                   </div>
                 </div>
               )}
