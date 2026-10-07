@@ -100,14 +100,22 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
             const di = closedNow ? dueInfo(t.due) : t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due)
             const line = !t.due ? '' : closedNow ? `Berakhir ${fmtFull(t.due)}` : `${t.revise ? 'Perbaiki sebelum' : 'Batas'} ${fmtFull(t.due)}`
             return (
-              <button className={'item ' + di.c} key={t.id} onClick={() => onOpen?.(t.id)}>
-                <span className="item-t">
+              <div className={'item row ' + di.c} key={t.id}>
+                <button className="item-t item-link" onClick={() => onOpen?.(t.id)}>
                   <b>{t.title}</b>
                   {t.subjects?.name && <small>{t.subjects.name}</small>}
                   {line && <small>{line}{t.extended && !closedNow ? ' (diperpanjang)' : ''}</small>}
-                </span>
-                <span className={'chip ' + di.c}>{di.t}</span>
-              </button>
+                </button>
+                <div className="item-side">
+                  <span className={'chip ' + di.c}>{di.t}</span>
+                  {!closedNow && (
+                    <button className={'btn3d' + (t.revise ? ' fix' : '')} onClick={() => onOpen?.(t.id)}>
+                      <span>{t.revise ? 'Perbaiki Sekarang' : 'Kerjakan Sekarang'}</span>
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                    </button>
+                  )}
+                </div>
+              </div>
             )
           })}
           {todo.length > SHOW && (
