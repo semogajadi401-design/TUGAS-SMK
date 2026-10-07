@@ -159,7 +159,7 @@ textarea:focus{border-color:var(--board);outline:none}
 .chip.none{background:#fdecea;color:var(--danger)}
 
 /* ---- Menu samping (drawer) ---- */
-.top{position:relative;z-index:1}
+.top{position:relative;z-index:5}
 .ttl{flex:1;min-width:0}
 .ttl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .menu-btn{width:44px;height:44px;border:0;border-radius:14px;background:rgba(255,255,255,.16);
