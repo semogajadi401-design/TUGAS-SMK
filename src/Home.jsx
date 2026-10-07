@@ -60,6 +60,32 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
     const pct = total ? Math.round((done / total) * 100) : 0
     const recent = [...graded].sort((a, b) => (b.at || '') < (a.at || '') ? -1 : 1).slice(0, 3)
 
+    // Satu baris tugas. `isEnded` = tenggat sudah lewat dan belum dikirim (tidak bisa dikerjakan lagi).
+    const item = (t, isEnded) => {
+      const di = isEnded ? dueInfo(t.due) : t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due)
+      const line = !t.due ? '' : isEnded ? `Berakhir ${fmtFull(t.due)}` : `${t.revise ? 'Perbaiki sebelum' : 'Batas'} ${fmtFull(t.due)}`
+      return (
+        <div className={'item row ' + di.c} key={t.id}>
+          <div className="item-t item-link">
+            <b>{t.title}</b>
+            {t.subjects?.name && <small>{t.subjects.name}</small>}
+            {line && <small>{line}{t.extended && !isEnded ? ' (diperpanjang)' : ''}</small>}
+          </div>
+          <div className="item-side">
+            <span className={'chip ' + di.c}>{di.t}</span>
+            {isEnded ? (
+              <button className="lite-btn" onClick={() => onOpen?.(t.id)}>Lihat detail</button>
+            ) : (
+              <button className={'btn3d' + (t.revise ? ' fix' : '')} onClick={() => onOpen?.(t.id)}>
+                <span>{t.revise ? 'Perbaiki Sekarang' : 'Kerjakan Sekarang'}</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
     return (<>
       <section className="sum" aria-label="Ringkasan tugas">
         <p className="sum-main">
@@ -91,40 +117,30 @@ export default function Home({ profile, goAccount, goTasks, onOpen }) {
       </section>
 
       <div className="sec-head"><h3>Perlu dikerjakan</h3></div>
-      {!todo.length ? (
-        <div className="empty-card">{total ? 'Tidak ada tugas yang tertunda. Kerja bagus!' : 'Tugas dari guru akan muncul di sini.'}</div>
+      {!open.length ? (
+        <div className="empty-card">
+          {!total ? 'Tugas dari guru akan muncul di sini.'
+            : closed.length ? 'Tidak ada tugas yang bisa dikerjakan sekarang.'
+            : 'Tidak ada tugas yang tertunda. Kerja bagus!'}
+        </div>
       ) : (
         <div className="list">
-          {todo.slice(0, SHOW).map((t) => {
-            const closedNow = isClosed(t.due)
-            const di = closedNow ? dueInfo(t.due) : t.revise ? { t: 'Perbaiki', c: 'late' } : dueInfo(t.due)
-            const line = !t.due ? '' : closedNow ? `Berakhir ${fmtFull(t.due)}` : `${t.revise ? 'Perbaiki sebelum' : 'Batas'} ${fmtFull(t.due)}`
-            return (
-              <div className={'item row ' + di.c} key={t.id}>
-                <div className="item-t item-link">
-                  <b>{t.title}</b>
-                  {t.subjects?.name && <small>{t.subjects.name}</small>}
-                  {line && <small>{line}{t.extended && !closedNow ? ' (diperpanjang)' : ''}</small>}
-                </div>
-                <div className="item-side">
-                  <span className={'chip ' + di.c}>{di.t}</span>
-                  {closedNow ? (
-                    <button className="lite-btn" onClick={() => onOpen?.(t.id)}>Lihat detail</button>
-                  ) : (
-                    <button className={'btn3d' + (t.revise ? ' fix' : '')} onClick={() => onOpen?.(t.id)}>
-                      <span>{t.revise ? 'Perbaiki Sekarang' : 'Kerjakan Sekarang'}</span>
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-          {todo.length > SHOW && (
-            <button className="item more" onClick={goTasks}>Lihat semua {todo.length} tugas</button>
+          {open.slice(0, SHOW).map((t) => item(t, false))}
+          {open.length > SHOW && (
+            <button className="item more" onClick={goTasks}>Lihat semua {open.length} tugas</button>
           )}
         </div>
       )}
+
+      {closed.length > 0 && (<>
+        <div className="sec-head"><h3>Waktu sudah berakhir</h3></div>
+        <div className="list">
+          {closed.slice(0, SHOW).map((t) => item(t, true))}
+          {closed.length > SHOW && (
+            <button className="item more" onClick={goTasks}>Lihat semua {closed.length} tugas yang berakhir</button>
+          )}
+        </div>
+      </>)}
 
       {recent.length > 0 && (<>
         <div className="sec-head"><h3>Nilai terbaru</h3></div>
