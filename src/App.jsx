@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
 import Login from './Login.jsx'
 import Dashboard from './Dashboard.jsx'
@@ -8,6 +8,23 @@ import { useNotifs, NotifPopup } from './Notifs.jsx'
 import { loadSettings, DEFAULTS } from './brand.jsx'
 import { useStudentPresence, useOnlineStudents } from './presence.jsx'
 import Welcome, { hasSeenWelcome, markWelcomeSeen } from './Welcome.jsx'
+import PushCard from './PushCard.jsx'
+import { useOnline } from './lib/net.js'
+import { toast } from './lib/toast.js'
+import { listPending, saveLastProfile, loadLastProfile, wipeCaches } from './lib/offline.js'
+import { syncPush, detachPush } from './lib/push.js'
+
+// Id pengguna dari sesi yang tersimpan di perangkat. Kosong bila sudah keluar dari akun.
+function storedUserId() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (/^sb-.+-auth-token$/.test(k)) return JSON.parse(localStorage.getItem(k))?.user?.id || null
+    }
+  } catch { /* abaikan */ }
+  return null
+}
+const TABS_FROM_LINK = ['tasks', 'materials', 'quiz', 'grades']
 
 // Jika file tab gagal diunduh (biasanya karena baru ada versi baru), muat ulang halaman satu kali.
 const lazyRetry = (load) => lazy(() => load().catch((e) => {
@@ -87,9 +104,56 @@ function ChangePassword({ onDone, code }) {
 const Soon = ({ text }) => <div className="empty">{text}</div>
 
 function Student({ profile, reload, s }) {
-  const [tab, setTab] = useState('home')
-  const [openId, setOpenId] = useState(null)
+  const online = useOnline()
+  // Dibuka dari pemberitahuan (?go=tasks&id=...) atau, bila offline, langsung ke Tugas.
+  const link = new URLSearchParams(window.location.search)
+  const [tab, setTab] = useState(() => {
+    const g = link.get('go')
+    return TABS_FROM_LINK.includes(g) ? g : (online ? 'home' : 'tasks')
+  })
+  const [openId, setOpenId] = useState(() => (link.get('go') === 'tasks' ? link.get('id') : null))
   const go = (k) => { if (k === 'tasks') setOpenId(null); setTab(k) }
+  const needsNet = !online && !['tasks', 'account'].includes(tab)
+
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+    // Pemberitahuan diketuk saat aplikasi sudah terbuka.
+    const onMsg = (e) => {
+      const d = e.data
+      if (d?.type !== 'go' || !TABS_FROM_LINK.includes(d.go)) return
+      if (d.go === 'tasks' && d.id) { setOpenId(d.id); setTab('tasks') } else go(d.go)
+    }
+    navigator.serviceWorker?.addEventListener('message', onMsg)
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg)
+  }, [])
+
+  // Pantau koneksi: beri tahu saat offline, dan ingatkan jawaban offline yang belum terkirim saat online lagi.
+  const wasOnline = useRef(online)
+  useEffect(() => {
+    let off = false
+    ;(async () => {
+      if (!online) {
+        toast({ kind: 'warn', text: 'Kamu sedang offline. Tugas yang sudah pernah dibuka tetap bisa dikerjakan dan disimpan di perangkat.' })
+      } else {
+        const list = await listPending(profile.id)
+        if (off) return
+        if (list.length) {
+          toast({
+            kind: 'warn', ms: 15000,
+            text: list.length === 1
+              ? `Jawaban "${list[0].title || 'tugas'}" yang kamu kerjakan saat offline belum terkirim.`
+              : `${list.length} jawaban yang kamu kerjakan saat offline belum terkirim.`,
+            action: { label: 'Kirim', onClick: () => { if (list.length === 1) { setOpenId(list[0].taskId); setTab('tasks') } else go('tasks') } },
+          })
+        } else if (!wasOnline.current) toast({ kind: 'ok', text: 'Internet kembali.', ms: 2500 })
+      }
+      wasOnline.current = online
+    })()
+    return () => { off = true }
+  }, [online])
+
+  // Pemberitahuan: perbarui pendaftaran perangkat ini (bila siswa sudah mengaktifkannya).
+  useEffect(() => { if (online) syncPush().catch(() => {}) }, [online, profile.id])
   const nt = useNotifs()
   const [kelas, setKelas] = useState('')
   useEffect(() => {
@@ -107,7 +171,7 @@ function Student({ profile, reload, s }) {
     return () => { off = true }
   }, [profile.id])
   const closeWelcome = () => { markWelcomeSeen(profile.id); setWelcome(false) }
-  useEffect(() => { if (['tasks', 'materials', 'grades', 'quiz'].includes(tab)) nt.markSeen(tab) }, [tab])
+  useEffect(() => { if (online && ['tasks', 'materials', 'grades', 'quiz'].includes(tab)) nt.markSeen(tab) }, [tab, online])
   const items = [
     { k: 'home', label: 'Beranda', icon: I.home },
     { k: 'tasks', label: 'Tugas', icon: I.tasks, badge: nt.counts.tasks },
@@ -120,14 +184,22 @@ function Student({ profile, reload, s }) {
   return (
     <Shell s={s} profile={me} role="Siswa" items={items} tab={tab} setTab={go}>
       {welcome && <Welcome name={profile.full_name.split(' ')[0]} onClose={closeWelcome} />}
+      {!online && <div className="offbar" role="status">Mode offline. Tugas yang sudah pernah dibuka tetap bisa dikerjakan.</div>}
+      {online && tab !== 'account' && <PushCard compact />}
       <Boundary key={tab}><Suspense fallback={Wait}>
+      {needsNet && (
+        <div className="empty">
+          <p>Halaman ini butuh internet.</p>
+          <button className="btn" onClick={() => go('tasks')}>Buka tugas</button>
+        </div>
+      )}
       {nt.popup && <NotifPopup data={nt.popup} onClose={nt.closePopup} onGo={(k) => { nt.closePopup(); go(k) }} />}
-      {tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {!needsNet && tab === 'home' && <Home profile={me} goAccount={() => setTab('account')} goTasks={() => go('tasks')} onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
       {tab === 'tasks' && <StudentTasks profile={profile} openId={openId} setOpenId={setOpenId} />}
-      {tab === 'materials' && <StudentMaterials />}
-      {tab === 'quiz' && <StudentQuiz />}
-      {tab === 'calendar' && <Calendar onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
-      {tab === 'grades' && <Grades />}
+      {!needsNet && tab === 'materials' && <StudentMaterials />}
+      {!needsNet && tab === 'quiz' && <StudentQuiz />}
+      {!needsNet && tab === 'calendar' && <Calendar onOpen={(id) => { setOpenId(id); setTab('tasks') }} />}
+      {!needsNet && tab === 'grades' && <Grades />}
       {tab === 'account' && (<>
         <h2>Profil saya</h2>
         <dl className="prof">
@@ -135,6 +207,7 @@ function Student({ profile, reload, s }) {
           <div><dt>Kelas</dt><dd>{kelas || 'Belum ada kelas'}</dd></div>
           <div><dt>Username (kode masuk)</dt><dd>{me.code || '-'}</dd></div>
         </dl>
+        <PushCard />
         <h2>Ubah password</h2>
         <ChangePassword onDone={reload} code={profile.code} />
         <button className="btn ghost" style={{ marginTop: 16 }}
@@ -179,6 +252,19 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [state, setState] = useState('loading')
   const [s, setS] = useState(DEFAULTS)
+  const [offlineMode, setOfflineMode] = useState(false)
+  const online = useOnline()
+
+  // Sesi masih tersimpan tapi tidak bisa diperbarui karena offline: buka aplikasi dengan profil terakhir
+  // (hanya siswa). Setelah keluar dari akun, sesi terhapus sehingga jalur ini tidak bisa dipakai.
+  async function tryOffline() {
+    const uid = storedUserId()
+    if (!uid) return false
+    const p = await loadLastProfile()
+    if (!p || p.id !== uid || !p.active || p.role !== 'student') return false
+    setProfile(p); setState('in'); setOfflineMode(true)
+    return true
+  }
 
   useEffect(() => { loadSettings().then(setS).catch(() => {}) }, [])
   useEffect(() => {
@@ -190,10 +276,16 @@ export default function App() {
   useEffect(() => {
     let off = false
     withTimeout(supabase.auth.getSession())
-      .then(({ data }) => { if (!off) setSession(data.session ?? null) })
-      .catch(() => { if (!off) setState('error') })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, x) =>
-      setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x)))
+      .then(async ({ data, error }) => {
+        if (off) return
+        if (!data.session && (error || !navigator.onLine) && await tryOffline()) return
+        setSession(data.session ?? null)
+      })
+      .catch(async () => { if (!off && !(await tryOffline())) setState('error') })
+    const { data: sub } = supabase.auth.onAuthStateChange((e, x) => {
+      if (e === 'SIGNED_OUT') { detachPush(); wipeCaches() } // jawaban yang belum terkirim tetap disimpan
+      setSession((prev) => (prev && x && prev.user.id === x.user.id ? prev : x))
+    })
     return () => { off = true; sub.subscription.unsubscribe() }
   }, [])
 
@@ -208,9 +300,10 @@ export default function App() {
         await supabase.auth.signOut(); setProfile(null); setState('out'); return
       }
       try { sessionStorage.removeItem('chunk-retry') } catch { /* abaikan */ }
-      setProfile(data); setState('in')
+      saveLastProfile(data)
+      setProfile(data); setState('in'); setOfflineMode(false)
     } catch {
-      setState('error')
+      if (!(await tryOffline())) setState('error')
     }
   }
 
@@ -219,6 +312,14 @@ export default function App() {
   // efek tidak jalan lagi, dan layar macet di "Memuat...".
   useEffect(() => { if (session !== undefined) loadProfile(session) },
     [session === undefined, session?.user?.id])
+
+  // Internet kembali saat aplikasi dibuka dalam mode offline: pulihkan sesi dan muat ulang profil.
+  useEffect(() => {
+    if (!offlineMode || !online) return
+    supabase.auth.getSession()
+      .then(({ data }) => { if (data.session) { setSession(data.session); loadProfile(data.session) } })
+      .catch(() => {})
+  }, [offlineMode, online])
 
   if (state === 'loading') return <div className="center">Memuat...</div>
   if (state === 'error') return (

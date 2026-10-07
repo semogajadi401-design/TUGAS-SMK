@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
 import { callApi, compress } from './util.js'
 import { useQuestionUrls, QuestionHead } from './Questions.jsx'
 import { Icon, I } from './Shell.jsx'
 import { dueInfo, fmtFull, isClosed, relative } from './deadline.js'
+import { useOnline, isNetError, reportNetFailure } from './lib/net.js'
+import { toast } from './lib/toast.js'
+import { putCache, getCache, cachedTaskIds, savePending, getPending, delPending, listPending, cacheBlob, blobUrl } from './lib/offline.js'
 
 const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x?.return_note ? 'revise' : x ? 'draft' : 'todo')
 const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
@@ -11,24 +14,50 @@ const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jaw
 const MAX_PHOTOS = 6 // tugas tanpa soal bernomor
 const MAX_PER_Q = 3 // per soal bernomor
 
-function List({ onOpen }) {
+function List({ onOpen, profile }) {
+  const uid = profile.id
+  const online = useOnline()
   const [rows, setRows] = useState(null)
   const [f, setF] = useState('todo')
   const [sj, setSj] = useState('')
+  const [fromCache, setFromCache] = useState(false)
+  const [pend, setPend] = useState(new Set())   // tugas yang punya jawaban offline belum terkirim
+  const [saved, setSaved] = useState(new Set()) // tugas yang sudah tersimpan di perangkat (bisa dibuka offline)
 
   useEffect(() => {
-    (async () => {
-      const [a, s, e] = await Promise.all([
-        supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active')
-          .order('due_at', { ascending: true, nullsFirst: false }),
-        supabase.from('submissions').select('assignment_id,status,score,return_note'),
-        supabase.from('task_extensions').select('assignment_id,due_at'), // perpanjangan dari guru
-      ])
-      const m = new Map((s.data || []).map((x) => [x.assignment_id, x]))
-      const ext = new Map((e.data || []).map((x) => [x.assignment_id, x.due_at]))
-      setRows((a.data || []).map((t) => ({ ...t, due: ext.get(t.id) || t.due_at, extended: ext.has(t.id), st: stateOf(m.get(t.id)) })))
+    let off = false
+    ;(async () => {
+      let list = null
+      if (online) {
+        const [a, s, e] = await Promise.all([
+          supabase.from('assignments').select('id,title,due_at,subjects(name)').eq('status', 'active')
+            .order('due_at', { ascending: true, nullsFirst: false }),
+          supabase.from('submissions').select('assignment_id,status,score,return_note'),
+          supabase.from('task_extensions').select('assignment_id,due_at'), // perpanjangan dari guru
+        ])
+        if ([a, s].some((r) => r.error && isNetError(r.error))) reportNetFailure()
+        else {
+          const m = new Map((s.data || []).map((x) => [x.assignment_id, x]))
+          const ext = new Map((e.data || []).map((x) => [x.assignment_id, x.due_at]))
+          list = (a.data || []).map((t) => ({ ...t, due: ext.get(t.id) || t.due_at, extended: ext.has(t.id), st: stateOf(m.get(t.id)) }))
+          putCache(uid, 'list', list)
+        }
+      }
+      const shown = list || (await getCache(uid, 'list')) || []
+      const [p, c] = await Promise.all([listPending(uid), cachedTaskIds(uid)])
+      if (off) return
+      setFromCache(!list); setPend(new Set(p.map((x) => x.taskId))); setSaved(c); setRows(shown)
     })()
-  }, [])
+    return () => { off = true }
+  }, [online])
+
+  function open(t) {
+    if (!online && !saved.has(t.id)) {
+      toast({ kind: 'warn', text: 'Tugas ini belum pernah dibuka saat online, jadi belum bisa dibuka offline.' })
+      return
+    }
+    onOpen(t.id)
+  }
 
   const filters = [['todo', 'Belum'], ['sent', 'Dikirim'], ['graded', 'Dinilai'], ['all', 'Semua']]
   const match = (r) => f === 'all' || (f === 'todo' ? r.st === 'todo' || r.st === 'draft' || r.st === 'revise' : r.st === f)
@@ -45,16 +74,19 @@ function List({ onOpen }) {
         {mapel.map((m) => <option key={m}>{m}</option>)}
       </select>
     )}
+    {fromCache && rows?.length > 0 && <p className="muted">Menampilkan daftar tugas terakhir yang tersimpan di perangkat.</p>}
     {rows === null && <div className="empty">Memuat...</div>}
-    {rows && !shown.length && <div className="empty">Tidak ada tugas di kategori ini.</div>}
+    {rows && !rows.length && fromCache && <div className="empty">Daftar tugas belum tersimpan di perangkat. Buka aplikasi saat online sekali dulu.</div>}
+    {rows && (rows.length > 0 || !fromCache) && !shown.length && <div className="empty">Tidak ada tugas di kategori ini.</div>}
     {shown.map((t) => {
       const di = dueInfo(t.due)
       const pending = t.st === 'todo' || t.st === 'draft' || t.st === 'revise'
       return (
-        <button className="task" key={t.id} onClick={() => onOpen(t.id)}>
+        <button className="task" key={t.id} onClick={() => open(t)}>
           <div>
             <b>{t.title}</b>
-            <div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}</div>
+            <div className="muted">{t.subjects?.name ? t.subjects.name + ' · ' : ''}{LABEL[t.st]}{!online && !saved.has(t.id) ? ' · Belum tersedia offline' : ''}</div>
+            {pend.has(t.id) && <div className="muted pendline">Jawaban offline belum terkirim</div>}
             {pending && t.due && (
               <div className="muted">{di.closed ? 'Berakhir ' : 'Batas '}{fmtFull(t.due)}{t.extended && !di.closed ? ' (diperpanjang)' : ''}</div>
             )}
@@ -69,6 +101,8 @@ function List({ onOpen }) {
 }
 
 function Detail({ id, profile, onBack }) {
+  const uid = profile.id
+  const online = useOnline()
   const [task, setTask] = useState(null)
   const [sub, setSub] = useState(null)
   const [photos, setPhotos] = useState([])
@@ -82,30 +116,121 @@ function Detail({ id, profile, onBack }) {
   const [msg, setMsg] = useState(null)
   const [grp, setGrp] = useState(undefined)
   const [ext, setExt] = useState(null) // perpanjangan dari guru (jika ada)
+  const [pend, setPend] = useState(null)         // jawaban yang disimpan di perangkat dan belum terkirim
+  const [missing, setMissing] = useState('')     // alasan halaman tidak bisa dibuka (mis. belum pernah dibuka saat online)
+  const [fromCache, setFromCache] = useState(false)
+  const lockRef = useRef(false)
+
+  // Pulihkan jawaban dari perangkat. Isi di perangkat menang atas draf di server.
+  function restore(p, ph) {
+    setText(p.text || ''); setAnswers(p.answers || {})
+    setAdded((p.photos || []).map((x) => ({ file: x.blob, q: x.q, ready: !!x.ready, url: URL.createObjectURL(x.blob) })))
+    setRemoved(ph.filter((x) => (p.removedIds || []).includes(x.id)))
+    setPend(p)
+  }
 
   async function load() {
-    const [t, s, e] = await Promise.all([
-      supabase.from('assignments').select('*').eq('id', id).single(),
-      supabase.from('submissions').select('*, submission_photos(id,path,question_id)').eq('assignment_id', id).maybeSingle(),
-      supabase.from('task_extensions').select('due_at').eq('assignment_id', id).eq('student_id', profile.id).maybeSingle(),
-    ])
-    setExt(e.data?.due_at || null)
-    setTask(t.data); setSub(s.data); setText(s.data?.text_answer || ''); setAnswers(s.data?.answers || {})
-    if (t.data?.is_group) callApi('/api/group', { action: 'mine', assignment_id: id }).then(setGrp).catch(() => setGrp({ group: null, isLeader: false }))
-    else setGrp(null)
-    const list = s.data?.submission_photos || []
-    if (list.length) {
-      const { data } = await supabase.storage.from('jawaban').createSignedUrls(list.map((p) => p.path), 3600)
-      setPhotos(list.map((p, i) => ({ ...p, url: data?.[i]?.signedUrl })))
-    } else setPhotos([])
-    if (t.data?.attachment_path) {
-      const { data } = await supabase.storage.from('lampiran').createSignedUrl(t.data.attachment_path, 3600)
-      setAttach(data?.signedUrl || '')
+    setMissing('')
+    let netFail = !online
+    if (online) {
+      const [t, s, e] = await Promise.all([
+        supabase.from('assignments').select('*').eq('id', id).single(),
+        supabase.from('submissions').select('*, submission_photos(id,path,question_id)').eq('assignment_id', id).maybeSingle(),
+        supabase.from('task_extensions').select('due_at').eq('assignment_id', id).eq('student_id', profile.id).maybeSingle(),
+      ])
+      netFail = [t, s].some((r) => r.error && isNetError(r.error))
+      if (netFail) reportNetFailure()
+      else if (!t.data) { setMissing('Tugas ini tidak ditemukan atau sudah dihapus oleh guru.'); return }
+      else {
+        setFromCache(false)
+        setExt(e.data?.due_at || null)
+        setTask(t.data); setSub(s.data); setText(s.data?.text_answer || ''); setAnswers(s.data?.answers || {})
+        let g = null
+        if (t.data.is_group) {
+          try { g = await callApi('/api/group', { action: 'mine', assignment_id: id }) }
+          catch (err) {
+            const old = isNetError(err) ? (await getCache(uid, 'task:' + id))?.grp : null
+            g = old || { group: null, isLeader: false }
+          }
+        }
+        setGrp(g)
+        const list = s.data?.submission_photos || []
+        let ph = []
+        if (list.length) {
+          const { data } = await supabase.storage.from('jawaban').createSignedUrls(list.map((p) => p.path), 3600)
+          ph = list.map((p, i) => ({ ...p, url: data?.[i]?.signedUrl }))
+        }
+        setPhotos(ph)
+        let url = ''
+        if (t.data.attachment_path) {
+          const { data } = await supabase.storage.from('lampiran').createSignedUrl(t.data.attachment_path, 3600)
+          url = data?.signedUrl || ''
+        }
+        setAttach(url)
+        // Simpan salinan supaya halaman ini tetap bisa dibuka dan dikerjakan saat offline.
+        await putCache(uid, 'task:' + id, { task: t.data, sub: s.data, ext: e.data?.due_at || null, grp: g, photos: list })
+        ph.forEach((p) => cacheBlob('jawaban', p.path, p.url))
+        cacheBlob('lampiran', t.data.attachment_path, url)
+        const p = await getPending(uid, id)
+        if (p && (s.data?.status === 'submitted' || s.data?.score != null)) { await delPending(uid, id); setPend(null) } // sudah terkirim dari perangkat lain
+        else if (p) restore(p, ph)
+        else setPend(null)
+        return
+      }
     }
+    // Offline (atau jaringan putus): pakai salinan di perangkat.
+    const c = await getCache(uid, 'task:' + id)
+    if (!c?.task) { setMissing('Halaman tugas ini belum pernah dibuka saat online, jadi belum tersedia offline. Buka sekali saat ada internet.'); return }
+    setFromCache(true)
+    setExt(c.ext || null)
+    setTask(c.task); setSub(c.sub); setText(c.sub?.text_answer || ''); setAnswers(c.sub?.answers || {})
+    setGrp(c.task.is_group ? (c.grp || { group: null, isLeader: false }) : null)
+    const ph = await Promise.all((c.photos || []).map(async (p) => ({ ...p, url: await blobUrl('jawaban', p.path) })))
+    setPhotos(ph)
+    setAttach(c.task.attachment_path ? await blobUrl('lampiran', c.task.attachment_path) : '')
+    const p = await getPending(uid, id)
+    if (p) restore(p, ph); else setPend(null)
   }
   useEffect(() => { load() }, [id])
-  const qurls = useQuestionUrls(task?.questions)
 
+  // Internet kembali saat halaman dibuka dari salinan: muat data terbaru bila belum ada yang diubah.
+  useEffect(() => {
+    if (online && fromCache && !pend && !added.length && !removed.length) load()
+  }, [online])
+
+  const qurls = useQuestionUrls(task?.questions, { cache: true, online })
+
+  // Ada perubahan dibanding isi di server? (dipakai agar membuka tugas saat offline tidak dianggap "belum terkirim")
+  const norm = (o) => JSON.stringify(Object.entries(o || {}).filter(([, v]) => String(v || '').trim()).sort())
+  const dirty = () => (text || '').trim() !== (sub?.text_answer || '').trim()
+    || norm(answers) !== norm(sub?.answers) || added.length > 0 || removed.length > 0
+
+  // Simpan jawaban di perangkat (IndexedDB). explicit = siswa menekan tombol simpan.
+  async function persistLocal(explicit = false) {
+    if (!task || lockRef.current) return false
+    if (!dirty()) { if (pend) { await delPending(uid, id); setPend(null) } return false }
+    const rec = {
+      title: task.title, text, answers,
+      photos: added.map((a) => ({ q: a.q, blob: a.file, ready: !!a.ready })),
+      removedIds: removed.map((p) => p.id),
+      savedAt: explicit ? Date.now() : (pend?.savedAt || Date.now()),
+    }
+    await savePending(uid, id, rec)
+    setPend({ ...rec, taskId: id })
+    return true
+  }
+
+  // Saat offline, setiap perubahan disimpan otomatis di perangkat.
+  useEffect(() => {
+    if (!task || online) return undefined
+    const h = setTimeout(() => { persistLocal().catch(() => {}) }, 800)
+    return () => clearTimeout(h)
+  }, [text, answers, added, removed, online])
+
+  if (missing) return (<>
+    <button className="link" style={{ marginTop: 0 }} onClick={onBack}>Kembali</button>
+    <div className="empty">{missing}</div>
+  </>)
   if (!task || (task.is_group && grp === undefined)) return <div className="empty">Memuat...</div>
 
   const graded = sub?.score != null
@@ -114,6 +239,7 @@ function Detail({ id, profile, onBack }) {
   const due = ext || task.due_at                 // tenggat efektif (perpanjangan guru jika ada)
   const closed = isClosed(due) && !graded && !sent // waktu habis sebelum dikirim
   const locked = viewer || graded || sent || closed // setelah dikirim atau waktu habis, jawaban tidak bisa diubah
+  lockRef.current = locked
   const wantsPhoto = task.answer_type !== 'text' && !viewer
   const wantsText = task.answer_type !== 'photo'
   const questions = task.questions || []
@@ -141,15 +267,38 @@ function Detail({ id, profile, onBack }) {
     both: ['Pilih salah satu cara menjawab', 'Kamu boleh mengirim foto, atau mengetik langsung di layar. Memakai keduanya juga boleh. Cukup salah satu terisi agar tugas bisa dikirim.'],
   }[task.answer_type]
 
-  function pick(e, q = null) {
+  async function pick(e, q = null) {
     const room = q ? MAX_PER_Q - countOf(q) : MAX_PHOTOS - total
     const files = [...e.target.files].slice(0, Math.max(0, room))
-    setAdded([...added, ...files.map((file) => ({ file, q, url: URL.createObjectURL(file) }))])
     e.target.value = ''
+    // Saat offline, foto langsung diperkecil supaya hemat ruang penyimpanan perangkat.
+    const items = await Promise.all(files.map(async (file) => {
+      if (online) return { file, q, url: URL.createObjectURL(file) }
+      try { const b = await compress(file); return { file: b, q, ready: true, url: URL.createObjectURL(b) } }
+      catch { return { file, q, url: URL.createObjectURL(file) } }
+    }))
+    setAdded((cur) => [...cur, ...items])
+  }
+
+  // Tombol "Simpan di perangkat" (saat offline).
+  async function saveLocal() {
+    if (busy) return
+    setBusy(true); setMsg(null)
+    try {
+      if (isClosed(due)) throw new Error('Waktu pengerjaan sudah berakhir, jadi jawaban tidak bisa disimpan lagi. Hubungi gurumu jika perlu tambahan waktu.')
+      const did = await persistLocal(true)
+      setMsg(did
+        ? { ok: true, t: 'Tersimpan di perangkat. Setelah internet kembali, tombol "Kirim jawaban" muncul di halaman ini.' }
+        : { ok: false, t: 'Belum ada jawaban baru untuk disimpan.' })
+    } catch (e) {
+      setMsg({ ok: false, t: 'Jawaban gagal disimpan di perangkat (penyimpanan penuh atau dibatasi browser). Salin jawabanmu dulu supaya tidak hilang.' })
+    }
+    setBusy(false)
   }
 
   async function save(submit) {
     if (busy) return
+    if (!online) return saveLocal()
     setBusy(true); setMsg(null)
     try {
       if (isClosed(due)) throw new Error('Waktu pengerjaan sudah berakhir, jadi jawaban tidak bisa disimpan atau dikirim lagi. Hubungi gurumu jika perlu tambahan waktu.')
@@ -174,10 +323,14 @@ function Detail({ id, profile, onBack }) {
       // Kompres + unggah semua foto sekaligus (bukan satu per satu), lalu satu kali insert.
       const stamp = Date.now()
       const paths = await Promise.all(added.map(async (a, i) => {
-        const blob = await compress(a.file)
+        const blob = a.ready ? a.file : await compress(a.file)
         const path = `${profile.id}/${row.id}/${stamp}-${i}.jpg`
         const up = await supabase.storage.from('jawaban').upload(path, blob, { contentType: 'image/jpeg' })
-        if (up.error) throw new Error('Foto gagal diunggah. Periksa koneksi internet lalu coba lagi. Jawabanmu belum terkirim.')
+        if (up.error) {
+          const er = new Error('Foto gagal diunggah. Periksa koneksi internet lalu coba lagi. Jawabanmu belum terkirim.')
+          er.net = isNetError(up.error)
+          throw er
+        }
         return path
       }))
       if (paths.length) {
@@ -203,12 +356,24 @@ function Detail({ id, profile, onBack }) {
         try { await callApi('/api/group', { action: 'sync', assignment_id: id }) }
         catch { throw new Error('Jawabanmu tersimpan, tapi belum diteruskan ke anggota kelompok. Tekan tombol simpan sekali lagi.') }
       }
+      await delPending(uid, id); setPend(null) // sudah di server, salinan di perangkat tidak diperlukan lagi
       setAdded([]); setRemoved([])
       await load()
       setMsg({ ok: true, t: submit ? 'Tugas terkirim ke guru dan tidak bisa diubah lagi.' : 'Jawabanmu tersimpan. Kamu masih bisa mengubahnya sebelum dikirim.' })
     } catch (e) {
-      setMsg({ ok: false, t: /row-level security/.test(e.message)
-        ? 'Tugas ini sudah terkunci (sudah dikirim atau sudah dinilai), jadi tidak bisa diubah.' : e.message })
+      if (isNetError(e)) {
+        // Koneksi putus di tengah jalan: jangan sampai jawaban hilang.
+        reportNetFailure()
+        try {
+          await persistLocal(true)
+          setMsg({ ok: true, t: 'Koneksi terputus. Jawabanmu aman di perangkat. Setelah internet kembali, tekan "Kirim jawaban".' })
+        } catch {
+          setMsg({ ok: false, t: 'Koneksi terputus dan jawaban belum bisa disimpan di perangkat. Salin jawabanmu dulu supaya tidak hilang.' })
+        }
+      } else {
+        setMsg({ ok: false, t: /row-level security/.test(e.message)
+          ? 'Tugas ini sudah terkunci (sudah dikirim atau sudah dinilai), jadi tidak bisa diubah.' : e.message })
+      }
     }
     setBusy(false)
   }
@@ -274,6 +439,13 @@ function Detail({ id, profile, onBack }) {
           : `Tugas kelompok ${grp.group.name}. Yang mengirim jawaban adalah ketua: ${grp.group.leader_name}.`}
       </div>
     )}
+    {!locked && !online && (
+      <div className="banner offnote" role="note">
+        <b>Kamu sedang offline.</b> Kerjakan seperti biasa, lalu tekan <b>Simpan di perangkat</b>.
+        Jawabanmu baru terkirim ke guru setelah internet kembali dan kamu menekan <b>Kirim jawaban</b>.
+        {due ? <> Batas pengumpulan tetap berlaku: kirim sebelum <b>{fmtFull(due)}</b>.</> : null}
+      </div>
+    )}
     {sub?.return_note && sub.status !== 'submitted' && !graded && (
       <div className="banner"><b>Guru meminta perbaikan:</b> {sub.return_note}</div>
     )}
@@ -326,19 +498,30 @@ function Detail({ id, profile, onBack }) {
 
     {msg && <div className={msg.ok ? 'ok' : 'err'} role="status">{msg.t}</div>}
     {!locked && <div className={'ready' + (ready ? ' ok' : '')} role="status">{readyText}</div>}
-    {!locked && (
-      <div className="picks">
-        <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan dulu</button>
-        <button className="btn" disabled={busy} onClick={() => save(true)}>{busy ? 'Mengirim...' : 'Kirim Sekarang'}</button>
+    {!locked && pend && (
+      <div className="banner pend" role="status">
+        {online
+          ? <>Jawaban yang kamu simpan saat offline ({fmtFull(pend.savedAt)}) <b>belum terkirim ke guru</b>. Periksa lagi, lalu tekan <b>Kirim jawaban</b>.</>
+          : <>Tersimpan di perangkat ({fmtFull(pend.savedAt)}). Belum terkirim ke guru.</>}
       </div>
     )}
+    {!locked && (online ? (
+      <div className="picks">
+        <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan dulu</button>
+        <button className="btn" disabled={busy} onClick={() => save(true)}>{busy ? 'Mengirim...' : pend ? 'Kirim jawaban' : 'Kirim Sekarang'}</button>
+      </div>
+    ) : (
+      <div className="picks">
+        <button className="btn" disabled={busy} onClick={saveLocal}>{busy ? 'Menyimpan...' : 'Simpan di perangkat'}</button>
+      </div>
+    ))}
   </>)
 }
 
 export default function StudentTasks({ profile, openId, setOpenId }) {
   return openId
     ? <Detail id={openId} profile={profile} onBack={() => setOpenId(null)} />
-    : <List onOpen={setOpenId} />
+    : <List onOpen={setOpenId} profile={profile} />
 }
 
 function TaskGrades() {
