@@ -7,7 +7,7 @@ import { dueInfo, fmtFull, isClosed, relative } from './deadline.js'
 
 const stateOf = (x) => (x?.score != null ? 'graded' : x?.status === 'submitted' ? 'sent' : x?.return_note ? 'revise' : x ? 'draft' : 'todo')
 const LABEL = { revise: 'Perlu diperbaiki', todo: 'Belum dikerjakan', draft: 'Draf', sent: 'Terkirim', graded: 'Dinilai' }
-const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto dan teks' }
+const TYPE = { photo: 'Jawab dengan foto', text: 'Jawab dengan teks', both: 'Jawab dengan foto atau teks' }
 const MAX_PHOTOS = 6 // tugas tanpa soal bernomor
 const MAX_PER_Q = 3 // per soal bernomor
 
@@ -126,6 +126,20 @@ function Detail({ id, profile, onBack }) {
     return task.answer_type === 'photo' ? n > 0 : task.answer_type === 'text' ? !!t : n > 0 || !!t
   }
   const di = dueInfo(due)
+  const both = task.answer_type === 'both'
+  const nAns = hasQ ? questions.filter((q) => answered(q.id)).length : 0
+  const ready = hasQ
+    ? nAns === questions.length
+    : task.answer_type === 'photo' ? total > 0 : task.answer_type === 'text' ? !!text.trim() : total > 0 || !!text.trim()
+  const readyText = ready ? 'Jawabanmu sudah lengkap dan siap dikirim.'
+    : hasQ ? `${nAns} dari ${questions.length} soal sudah dijawab. ${both ? 'Tiap soal cukup dijawab dengan foto atau teks.' : 'Lengkapi semua soal sebelum mengirim.'}`
+    : both ? 'Belum ada jawaban. Tambahkan foto atau ketik jawaban (salah satu sudah cukup).'
+    : task.answer_type === 'photo' ? 'Belum ada foto jawaban.' : 'Belum ada jawaban teks.'
+  const GUIDE = {
+    photo: ['Cara menjawab: kirim foto', 'Foto jawabanmu di kertas, lalu unggah di bawah.'],
+    text: ['Cara menjawab: ketik di layar', 'Tulis jawabanmu langsung di kolom teks di bawah.'],
+    both: ['Pilih salah satu cara menjawab', 'Kamu boleh mengirim foto, atau mengetik langsung di layar. Memakai keduanya juga boleh. Cukup salah satu terisi agar tugas bisa dikirim.'],
+  }[task.answer_type]
 
   function pick(e, q = null) {
     const room = q ? MAX_PER_Q - countOf(q) : MAX_PHOTOS - total
@@ -245,6 +259,13 @@ function Detail({ id, profile, onBack }) {
     )}
     {task.instructions && <p className="instr">{task.instructions}</p>}
     {attach && <a className="btn ghost attach" href={attach} target="_blank" rel="noreferrer">Buka lampiran dari guru</a>}
+    {!locked && GUIDE && (
+      <div className="howto" role="note">
+        <b>{GUIDE[0]}</b>
+        <span>{GUIDE[1]}{hasQ ? ' Berlaku untuk setiap soal.' : ''}</span>
+        {both && <div className="opts"><span className="opt">Foto</span><i>atau</i><span className="opt">Teks</span><i>(boleh keduanya)</i></div>}
+      </div>
+    )}
 
     {task.is_group && (
       <div className="banner">
@@ -273,21 +294,24 @@ function Detail({ id, profile, onBack }) {
     {hasQ ? questions.map((q, i) => (
       <div className="qcard" key={q.id}>
         <QuestionHead n={i + 1} q={q} url={qurls[q.id]} onZoom={setZoom} />
+        {!locked && <span className={'qstate' + (answered(q.id) ? ' ok' : '')}>{answered(q.id) ? 'Sudah dijawab' : 'Belum dijawab'}</span>}
         {wantsPhoto && photoBox(q.id, MAX_PER_Q)}
+        {both && wantsPhoto && wantsText && <div className="or"><span>atau</span></div>}
         {wantsText && (<>
-          <label className="qlabel" htmlFor={'a' + q.id}>Jawaban soal {i + 1}</label>
+          <label className="qlabel" htmlFor={'a' + q.id}>{both ? `Ketik jawaban soal ${i + 1}` : `Jawaban soal ${i + 1}`}</label>
           <textarea id={'a' + q.id} rows="4" value={answers[q.id] || ''} disabled={locked}
             onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Ketik jawabanmu di sini" />
         </>)}
       </div>
     )) : (<>
       {wantsPhoto && (<>
-        <h3 className="sec">Foto jawaban</h3>
+        <h3 className="sec">{both ? 'Cara 1: foto jawaban' : 'Foto jawaban'}</h3>
         {sub?.photos_cleaned && <p className="muted">Foto sudah dibersihkan guru untuk menghemat penyimpanan. Nilaimu tetap tersimpan.</p>}
         {photoBox(null, MAX_PHOTOS)}
       </>)}
+      {both && wantsPhoto && wantsText && <div className="or"><span>atau</span></div>}
       {wantsText && (<>
-        <h3 className="sec">Jawaban teks</h3>
+        <h3 className="sec">{both ? 'Cara 2: ketik jawaban' : 'Jawaban teks'}</h3>
         <textarea rows="6" value={text} disabled={locked} onChange={(e) => setText(e.target.value)}
           placeholder="Ketik jawabanmu di sini" />
       </>)}
@@ -301,6 +325,7 @@ function Detail({ id, profile, onBack }) {
     )}
 
     {msg && <div className={msg.ok ? 'ok' : 'err'} role="status">{msg.t}</div>}
+    {!locked && <div className={'ready' + (ready ? ' ok' : '')} role="status">{readyText}</div>}
     {!locked && (
       <div className="picks">
         <button className="btn ghost" disabled={busy} onClick={() => save(false)}>Simpan dulu</button>
