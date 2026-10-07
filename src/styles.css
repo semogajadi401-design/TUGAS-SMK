@@ -199,6 +199,14 @@ textarea:focus{border-color:var(--board);outline:none}
 .logo-out{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:10px 12px;
   border-radius:10px;font:inherit;font-size:.92rem;font-weight:700;color:var(--danger);cursor:pointer;text-align:left}
 .logo-out:hover,.logo-out:active{background:color-mix(in srgb,var(--danger) 10%,white)}
+.logo-menu{min-width:190px}
+.logo-ask{padding:8px 8px 6px;display:flex;flex-direction:column;gap:10px}
+.logo-ask span{font-size:.88rem;font-weight:600;color:var(--ink)}
+.logo-ask-btns{display:flex;gap:8px}
+.logo-ask-btns button{flex:1;border-radius:10px;padding:9px 8px;font:inherit;font-size:.86rem;font-weight:700;cursor:pointer;width:auto}
+.logo-yes{border:0;background:var(--danger);color:#fff}
+.logo-no{border:1.5px solid var(--line,#e4e7ec);background:#fff;color:var(--ink)}
+.logo-ask-btns button:disabled{opacity:.6;cursor:default}
 
 /* ---- Pengerjaan tugas (siswa) ---- */
 .task{width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit}
