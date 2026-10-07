@@ -580,3 +580,16 @@ input:focus,textarea:focus,select:focus{background:#fff;border-color:var(--board
 /* ---- Status "Dikembalikan" ---- */
 .chip.back{background:#ffe3cc;color:#8a3b00}
 .bnote{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-style:italic}
+
+/* ---- Pesan tenggat di kotak ringkasan siswa ---- */
+.sum-due{margin:12px 0 0;font-size:.92rem;line-height:1.45;color:#fff}
+.sum-due b{font-weight:700}
+.sum-due + .sum-due{margin-top:6px;opacity:.9}
+
+.dueline b{color:var(--ink,inherit);font-weight:700}
+.dueline.over,.dueline.over b{color:var(--danger)}
+
+/* ---- Perpanjangan waktu (guru) ---- */
+.rowact{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto}
+.extpanel{margin:12px 0}
+.extpanel .picks .btn{flex:1}
