@@ -100,6 +100,50 @@ function List({ onOpen, profile }) {
   </>)
 }
 
+// Progres teman sekelas: hanya nama, dikelompokkan menurut status. Nilai tidak pernah ditampilkan.
+const CM_GROUPS = [['done', 'Sudah mengumpulkan', 'ok'], ['back', 'Dikembalikan guru', 'back'], ['todo', 'Belum mengumpulkan', 'miss']]
+
+function Classmates({ id, onClose }) {
+  const [d, setD] = useState(null)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let off = false
+    callApi('/api/classmates', { assignment_id: id })
+      .then((r) => { if (!off) setD(r) })
+      .catch((e) => {
+        if (off) return
+        if (isNetError(e)) { reportNetFailure(); setErr('Butuh internet untuk melihat daftar ini.') } else setErr(e.message)
+      })
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', esc)
+    return () => { off = true; document.removeEventListener('keydown', esc) }
+  }, [id])
+
+  return (
+    <div className="modal-bg" onClick={onClose} role="presentation">
+      <div className="modal cm" role="dialog" aria-modal="true" aria-label="Teman sekelas" onClick={(e) => e.stopPropagation()}>
+        <h2>Teman sekelas</h2>
+        {!d && !err && <p className="muted">Memuat...</p>}
+        {err && <div className="err" role="alert">{err}</div>}
+        {d && (<>
+          <p className="muted">{d.kelas ? d.kelas + ' · ' : ''}<b>{d.done.length}</b> dari {d.total} sudah mengumpulkan</p>
+          {CM_GROUPS.map(([k, label, tone]) => d[k].length > 0 && (
+            <section key={k}>
+              <h3 className={'cm-h ' + tone}>{label}<span>{d[k].length}</span></h3>
+              <ul className="cm-list">
+                {d[k].map((x, i) => <li key={i} className={x.me ? 'me' : ''}>{x.n}{x.me && <i> (kamu)</i>}</li>)}
+              </ul>
+            </section>
+          ))}
+          {!d.total && <p className="muted">Belum ada teman sekelas yang terdaftar.</p>}
+        </>)}
+        <button className="btn ghost" style={{ marginTop: 16 }} onClick={onClose}>Tutup</button>
+      </div>
+    </div>
+  )
+}
+
 function Detail({ id, profile, onBack }) {
   const uid = profile.id
   const online = useOnline()
@@ -111,6 +155,7 @@ function Detail({ id, profile, onBack }) {
   const [text, setText] = useState('')
   const [answers, setAnswers] = useState({})
   const [zoom, setZoom] = useState('')
+  const [showCm, setShowCm] = useState(false) // panel progres teman sekelas
   const [attach, setAttach] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -422,6 +467,9 @@ function Detail({ id, profile, onBack }) {
         {ext && !closed ? ' · diperpanjang oleh guru' : ''}
       </p>
     )}
+    <button className="btn ghost attach" disabled={!online} onClick={() => setShowCm(true)}>
+      Lihat teman sekelas{!online ? ' (butuh internet)' : ''}
+    </button>
     {task.instructions && <p className="instr">{task.instructions}</p>}
     {attach && <a className="btn ghost attach" href={attach} target="_blank" rel="noreferrer">Buka lampiran dari guru</a>}
     {!locked && GUIDE && (
@@ -489,6 +537,7 @@ function Detail({ id, profile, onBack }) {
       </>)}
     </>)}
     {hasQ && sub?.photos_cleaned && <p className="muted">Foto jawaban sudah dibersihkan guru untuk menghemat penyimpanan. Nilaimu tetap tersimpan.</p>}
+    {showCm && <Classmates id={id} onClose={() => setShowCm(false)} />}
     {zoom && (
       <div className="lightbox" onClick={() => setZoom('')}>
         <img src={zoom} alt="Gambar diperbesar" />
